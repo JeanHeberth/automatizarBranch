@@ -6,7 +6,7 @@ from git_operations import criar_branch, fazer_commit, push, atualizar_branch_pr
 def iniciar_interface():
     janela = tk.Tk()
     janela.title("Automacao Git com Tkinter")
-    janela.geometry("600x500")
+    janela.geometry("600x600")
 
     repo_var = tk.StringVar()
     log_output = tk.Text(janela, height=15)

@@ -1,0 +1,17 @@
+# Arquivos de log
+*.log
+
+# Ambiente virtual
+.venv/
+
+# PyCharm / IntelliJ / VSCode
+.idea/
+.vscode/
+
+# Arquivos Python compilados
+__pycache__/
+*.pyc
+*.pyo
+
+# Arquivos temporários de sistema
+.DS_Store
