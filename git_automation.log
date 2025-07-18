@@ -1,0 +1,8 @@
+[2025-07-18 09:57:09] $ git status --porcelain
+M __pycache__/git_operations.cpython-313.pyc
+ M __pycache__/gui.cpython-313.pyc
+ M __pycache__/utils.cpython-313.pyc
+ M git_operations.py
+ M gui.py
+ M utils.py
+
