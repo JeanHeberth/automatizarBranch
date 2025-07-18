@@ -1,8 +1,4 @@
-import os
-
-from utils import run_command, get_repo_path
-
-from utils import run_command, get_repo_path
+from utils import run_command, get_repo_path, log
 import os
 
 def get_default_branch():
