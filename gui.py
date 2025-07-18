@@ -1,7 +1,7 @@
 from tkinter import filedialog, simpledialog, messagebox
 import tkinter as tk
 
-from git_operations import criar_branch, fazer_commit, push
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
 from utils import set_repo_path, get_repo_path, has_changes
 
 
@@ -45,11 +45,19 @@ def iniciar_interface():
         _, output = push()
         messagebox.showinfo("Push", output)
 
+    def acao_atualizar_branch_principal():
+        sucesso, msg = atualizar_branch_principal()
+        if sucesso:
+            messagebox.showinfo("Sucesso", msg)
+        else:
+            messagebox.showerror("Erro", msg)
+
     # Interface
     tk.Label(janela, text="Repositório Git:").pack(pady=5)
     tk.Entry(janela, textvariable=repo_var, width=50, state="readonly").pack(padx=10)
     tk.Button(janela, text="Selecionar Repositório", command=selecionar_repositorio).pack(pady=10)
 
+    tk.Button(janela, text="Atualizar Branch Principal", command=acao_atualizar_branch_principal, width=30).pack(pady=5)
     tk.Button(janela, text="Criar Branch (feature/)", command=acao_criar_branch, width=30).pack(pady=5)
     tk.Button(janela, text="Fazer Commit", command=acao_commit, width=30).pack(pady=5)
     tk.Button(janela, text="Commit + Push", command=acao_commit_push, width=30).pack(pady=5)
