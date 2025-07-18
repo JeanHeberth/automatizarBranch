@@ -1,12 +1,15 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from utils import set_repo_path, get_repo_path, has_changes, get_logs
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
 
+from utils import clear_logs
+
 def iniciar_interface():
+    clear_logs()
     janela = tk.Tk()
     janela.title("Automacao Git com Tkinter")
-    janela.geometry("600x600")
+    janela.geometry("600x500")
 
     repo_var = tk.StringVar()
     log_output = tk.Text(janela, height=15)
@@ -20,6 +23,7 @@ def iniciar_interface():
         if path:
             set_repo_path(path)
             repo_var.set(path)
+            clear_logs()
             atualizar_logs()
 
     def acao_criar_branch():
@@ -27,11 +31,11 @@ def iniciar_interface():
         if not nome:
             return
         sucesso, msg = criar_branch(nome)
+        atualizar_logs()
         if sucesso:
             messagebox.showinfo("Sucesso", msg)
         else:
             messagebox.showerror("Erro", msg)
-        atualizar_logs()
 
     def acao_commit():
         if not get_repo_path():
@@ -43,22 +47,22 @@ def iniciar_interface():
         msg = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
         if msg:
             _, output = fazer_commit(msg)
+            atualizar_logs()
             messagebox.showinfo("Sucesso", output)
-        atualizar_logs()
 
     def acao_commit_push():
         acao_commit()
         _, output = push()
-        messagebox.showinfo("Push", output)
         atualizar_logs()
+        messagebox.showinfo("Push", output)
 
     def acao_atualizar_branch_principal():
         sucesso, msg = atualizar_branch_principal()
+        atualizar_logs()
         if sucesso:
             messagebox.showinfo("Sucesso", msg)
         else:
             messagebox.showerror("Erro", msg)
-        atualizar_logs()
 
     # Interface
     tk.Label(janela, text="Repositório Git:").pack(pady=5)
@@ -71,8 +75,6 @@ def iniciar_interface():
     tk.Button(janela, text="Commit + Push", command=acao_commit_push, width=40).pack(pady=5)
     tk.Button(janela, text="Sair", command=janela.quit, width=40).pack(pady=20)
 
-    tk.Label(janela, text="Logs:").pack()
-    log_output.pack(padx=10, fill="both", expand=True)
+    log_output.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-    atualizar_logs()
     janela.mainloop()
