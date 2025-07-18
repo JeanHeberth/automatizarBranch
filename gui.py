@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
 from interface_widgets import construir_interface
 
@@ -63,6 +63,20 @@ def iniciar_interface():
         else:
             messagebox.showerror("Erro", msg)
 
+    def acao_resolver_conflitos():
+        stdout, _ = run_command("git diff --name-only --diff-filter=U")
+        arquivos_conflito = stdout.splitlines()
+        atualizar_logs()
+        if arquivos_conflito:
+            abrir = messagebox.askyesno("Conflitos detectados", f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
+            if abrir:
+                for arquivo in arquivos_conflito:
+                    run_command(f"code {arquivo}")
+            else:
+                messagebox.showinfo("Info", "Após resolver os conflitos, execute 'git add' e 'git commit'.")
+        else:
+            messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
+
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -70,6 +84,7 @@ def iniciar_interface():
         acao_criar_branch,
         acao_commit,
         acao_commit_push,
+        acao_resolver_conflitos,
         log_output
     )
 
