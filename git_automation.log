@@ -1,9 +1,6 @@
-[2025-07-18 10:23:02] Executando: git status --porcelain
-[2025-07-18 10:23:02] Saída: M __pycache__/git_operations.cpython-313.pyc
- M __pycache__/gui.cpython-313.pyc
- M __pycache__/utils.cpython-313.pyc
+[2025-07-18 10:27:03] Executando: git status --porcelain
+[2025-07-18 10:27:03] Saída: M __pycache__/gui.cpython-313.pyc
  M git_automation.log
- M git_operations.py
  M gui.py
- M utils.py
-[2025-07-18 10:23:10] Executando: git add .
+AM interface_widgets.py
+[2025-07-18 10:27:21] Executando: git add .
