@@ -1,12 +1,14 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from utils import set_repo_path, get_repo_path, has_changes, get_logs
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
+from interface_widgets import construir_interface
 
 def iniciar_interface():
+    clear_logs()
     janela = tk.Tk()
     janela.title("Automacao Git com Tkinter")
-    janela.geometry("600x600")
+    janela.geometry("600x500")
 
     repo_var = tk.StringVar()
     log_output = tk.Text(janela, height=15)
@@ -20,6 +22,7 @@ def iniciar_interface():
         if path:
             set_repo_path(path)
             repo_var.set(path)
+            clear_logs()
             atualizar_logs()
 
     def acao_criar_branch():
@@ -27,11 +30,11 @@ def iniciar_interface():
         if not nome:
             return
         sucesso, msg = criar_branch(nome)
+        atualizar_logs()
         if sucesso:
             messagebox.showinfo("Sucesso", msg)
         else:
             messagebox.showerror("Erro", msg)
-        atualizar_logs()
 
     def acao_commit():
         if not get_repo_path():
@@ -43,36 +46,46 @@ def iniciar_interface():
         msg = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
         if msg:
             _, output = fazer_commit(msg)
+            atualizar_logs()
             messagebox.showinfo("Sucesso", output)
-        atualizar_logs()
 
     def acao_commit_push():
         acao_commit()
         _, output = push()
-        messagebox.showinfo("Push", output)
         atualizar_logs()
+        messagebox.showinfo("Push", output)
 
     def acao_atualizar_branch_principal():
         sucesso, msg = atualizar_branch_principal()
+        atualizar_logs()
         if sucesso:
             messagebox.showinfo("Sucesso", msg)
         else:
             messagebox.showerror("Erro", msg)
+
+    def acao_resolver_conflitos():
+        stdout, _ = run_command("git diff --name-only --diff-filter=U")
+        arquivos_conflito = stdout.splitlines()
         atualizar_logs()
+        if arquivos_conflito:
+            abrir = messagebox.askyesno("Conflitos detectados", f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
+            if abrir:
+                for arquivo in arquivos_conflito:
+                    run_command(f"code {arquivo}")
+            else:
+                messagebox.showinfo("Info", "Após resolver os conflitos, execute 'git add' e 'git commit'.")
+        else:
+            messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
 
-    # Interface
-    tk.Label(janela, text="Repositório Git:").pack(pady=5)
-    tk.Entry(janela, textvariable=repo_var, width=60, state="readonly").pack(padx=10)
-    tk.Button(janela, text="Selecionar Repositório", command=selecionar_repositorio).pack(pady=10)
+    construir_interface(
+        janela, repo_var,
+        selecionar_repositorio,
+        acao_atualizar_branch_principal,
+        acao_criar_branch,
+        acao_commit,
+        acao_commit_push,
+        acao_resolver_conflitos,
+        log_output
+    )
 
-    tk.Button(janela, text="Atualizar Branch Principal", command=acao_atualizar_branch_principal, width=40).pack(pady=5)
-    tk.Button(janela, text="Criar Branch (feature/)", command=acao_criar_branch, width=40).pack(pady=5)
-    tk.Button(janela, text="Fazer Commit", command=acao_commit, width=40).pack(pady=5)
-    tk.Button(janela, text="Commit + Push", command=acao_commit_push, width=40).pack(pady=5)
-    tk.Button(janela, text="Sair", command=janela.quit, width=40).pack(pady=20)
-
-    tk.Label(janela, text="Logs:").pack()
-    log_output.pack(padx=10, fill="both", expand=True)
-
-    atualizar_logs()
     janela.mainloop()
