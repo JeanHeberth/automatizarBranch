@@ -1,8 +1,12 @@
-import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs
+import tkinter as tk
+
+
+
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
 from interface_widgets import construir_interface
+from utils import clear_logs, set_repo_path, get_repo_path, has_changes, get_logs
+
 
 def iniciar_interface():
     clear_logs()
