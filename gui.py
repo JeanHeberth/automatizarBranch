@@ -1,8 +1,8 @@
-from tkinter import filedialog, simpledialog, messagebox
+from tkinter import filedialog, simpledialog, messagebox, scrolledtext
 import tkinter as tk
 
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
-from utils import set_repo_path, get_repo_path, has_changes
+from utils import set_repo_path, get_repo_path, has_changes, get_logs
 
 
 def iniciar_interface():
@@ -17,6 +17,11 @@ def iniciar_interface():
         if path:
             set_repo_path(path)
             repo_var.set(path)
+
+
+    def atualizar_logs():
+        log_output.delete("1.0", tk.END)
+        log_output.insert(tk.END, get_logs())
 
     def acao_criar_branch():
         nome = simpledialog.askstring("Nome da Branch", "Digite o nome da nova branch:")
@@ -61,6 +66,11 @@ def iniciar_interface():
     tk.Button(janela, text="Criar Branch (feature/)", command=acao_criar_branch, width=30).pack(pady=5)
     tk.Button(janela, text="Fazer Commit", command=acao_commit, width=30).pack(pady=5)
     tk.Button(janela, text="Commit + Push", command=acao_commit_push, width=30).pack(pady=5)
+
+    tk.Label(janela, text="Logs:").pack(pady=5)
+    log_output = scrolledtext.ScrolledText(janela, height=15, width=70, state="normal")
+    log_output.pack(padx=10, pady=10)
+
     tk.Button(janela, text="Sair", command=janela.quit, width=30).pack(pady=20)
 
     janela.mainloop()
