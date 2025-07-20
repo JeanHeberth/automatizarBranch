@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
-from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, fazer_checkout
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, fazer_checkout, get_current_branch
 from interface_widgets import construir_interface
 
 def iniciar_interface():
@@ -77,10 +77,7 @@ def iniciar_interface():
         else:
             messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
 
-
     def acao_checkout_branch():
-        from tkinter import Toplevel, ttk
-
         branches = listar_branches()
         if not branches:
             messagebox.showerror("Erro", "Nenhuma branch encontrada.")
@@ -111,6 +108,39 @@ def iniciar_interface():
 
         tk.Button(popup, text="OK", command=confirmar, width=10).pack(pady=10)
 
+    def acao_deletar_branch():
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Deletar Branch")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch para deletar:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch = branch_var.get()
+            if branch:
+                if branch == get_current_branch():
+                    messagebox.showwarning("Aviso", "Você não pode deletar a branch atual.")
+                else:
+                    stdout, stderr = run_command(f"git branch -D {branch}")
+                    atualizar_logs()
+                    if stderr:
+                        messagebox.showerror("Erro ao deletar", stderr)
+                    else:
+                        messagebox.showinfo("Branch Deletada", f"Branch '{branch}' foi deletada com sucesso.")
+            popup.destroy()
+
+        tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
     construir_interface(
         janela, repo_var,
@@ -121,6 +151,7 @@ def iniciar_interface():
         acao_commit_push,
         acao_resolver_conflitos,
         acao_checkout_branch,
+        acao_deletar_branch,
         log_output
     )
 
