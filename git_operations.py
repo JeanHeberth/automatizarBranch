@@ -52,10 +52,7 @@ def atualizar_branch_principal():
         return False, "Não foi possível identificar a branch principal."
     run_command(f"git checkout {branch_main}")
     run_command(f"git pull origin {branch_main}")
-    return True, f"Branch principal '{branch_main}' atualizada com sucesffdfdfdfdfdfdfdfdfdfso."
-    return True, f"Branch principal '{branch_main}' atualizada com sucesffdfdfdfdfdfdfdfdfdfso."
-    return True, f"Branch principal '{branch_main}' atualizada com sucesffdfdfdfdfdfdfdfdfdfso."
-    return True, f"Branch principal '{branch_main}' atualizada com sucesffdfdfdfdfdfdfdfdfdfso."
+    return True, f"Branch principal '{branch_main}' atualizada com sucesso."
 
 def listar_branches():
     stdout, _ = run_command("git branch --list")
