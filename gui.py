@@ -4,11 +4,12 @@ from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_log
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, fazer_checkout, get_current_branch
 from interface_widgets import construir_interface
 
+
 def iniciar_interface():
     clear_logs()
     janela = tk.Tk()
     janela.title("Automacao Git com Tkinter")
-    janela.geometry("600x500")
+    janela.geometry("800x800")
 
     repo_var = tk.StringVar()
     log_output = tk.Text(janela, height=15)
@@ -142,6 +143,40 @@ def iniciar_interface():
 
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
+    def acao_merge_para_principal():
+        branch_atual = get_current_branch()
+        if branch_atual != "develop":
+            messagebox.showwarning("Branch incorreta", f"Você está em '{branch_atual}'. Altere para 'develop' para continuar.")
+            return
+
+        destino = simpledialog.askstring("Merge", "Deseja fazer merge para 'main' ou 'master'?")
+        if destino not in ["main", "master"]:
+            messagebox.showerror("Erro", "Destino inválido. Use 'main' ou 'master'.")
+            return
+
+        run_command(f"git checkout {destino}")
+        run_command(f"git pull origin {destino}")
+        stdout, stderr = run_command("git merge develop")
+        atualizar_logs()
+
+        if "Already up to date." in stdout or "Merge made" in stdout:
+            run_command(f"git push origin {destino}")
+            messagebox.showinfo("Merge", f"Merge concluído para '{destino}' e push realizado.")
+        else:
+            messagebox.showwarning("Atenção", f"Merge feito para '{destino}', revise conflitos se houver.")
+
+    def acao_criar_pr():
+        origem = simpledialog.askstring("Criar PR", "Digite o nome da branch de origem:")
+        destino = simpledialog.askstring("Criar PR", "Digite o nome da branch de destino:")
+        if not origem or not destino:
+            messagebox.showerror("Erro", "Branch origem e destino são obrigatórias.")
+            return
+
+        url = f"https://github.com/seu-usuario/seu-repo/compare/{destino}...{origem}"
+        run_command(f"open {url}")  # macOS
+        # run_command(f"start {url}")  # Windows
+        messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -152,6 +187,8 @@ def iniciar_interface():
         acao_resolver_conflitos,
         acao_checkout_branch,
         acao_deletar_branch,
+        acao_merge_para_principal,
+        acao_criar_pr,
         log_output
     )
 
