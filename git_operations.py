@@ -29,9 +29,6 @@ def criar_branch(nome):
     run_command(f"git checkout {branch_main}")
     run_command("git pull")
 
-    if os.name != "nt":
-        run_command(f"git branch | grep -v '{branch_main}' | xargs git branch -D")
-
     run_command(f"git checkout -b {feature_branch}")
 
     if branch_remota_existe("develop"):
@@ -56,3 +53,20 @@ def atualizar_branch_principal():
     run_command(f"git checkout {branch_main}")
     run_command(f"git pull origin {branch_main}")
     return True, f"Branch principal '{branch_main}' atualizada com sucesso."
+
+def listar_branches():
+    stdout, _ = run_command("git branch --list")
+    return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
+
+def fazer_checkout(branch_nome):
+    stdout, stderr = run_command(f"git checkout {branch_nome}")
+    saida_total = f"{stdout}\n{stderr}".lower()
+
+    sucesso = (
+            "switched to" in saida_total or
+            "already on" in saida_total
+    )
+
+    return sucesso, stderr or stdout
+
+
