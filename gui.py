@@ -1,7 +1,7 @@
 import tkinter as tk
-from tkinter import filedialog, simpledialog, messagebox
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs
-from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal
+from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, fazer_checkout
 from interface_widgets import construir_interface
 
 def iniciar_interface():
@@ -32,7 +32,7 @@ def iniciar_interface():
         sucesso, msg = criar_branch(nome)
         atualizar_logs()
         if sucesso:
-            messagebox.showinfo("Sucesso", msg)
+            messagebox.showinfo("Checkout realizado", f"Branch selecionada com sucesso: {nome}")
         else:
             messagebox.showerror("Erro", msg)
 
@@ -59,9 +59,58 @@ def iniciar_interface():
         sucesso, msg = atualizar_branch_principal()
         atualizar_logs()
         if sucesso:
-            messagebox.showinfo("Sucesso", msg)
+            messagebox.showinfo("Atualização", msg)
         else:
             messagebox.showerror("Erro", msg)
+
+    def acao_resolver_conflitos():
+        stdout, _ = run_command("git diff --name-only --diff-filter=U")
+        arquivos_conflito = stdout.splitlines()
+        atualizar_logs()
+        if arquivos_conflito:
+            abrir = messagebox.askyesno("Conflitos detectados", f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
+            if abrir:
+                for arquivo in arquivos_conflito:
+                    run_command(f"code {arquivo}")
+            else:
+                messagebox.showinfo("Info", "Após resolver os conflitos, execute 'git add' e 'git commit'.")
+        else:
+            messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
+
+
+    def acao_checkout_branch():
+        from tkinter import Toplevel, ttk
+
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Checkout de Branch")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch para dar checkout:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch_selecionada = branch_var.get()
+            if branch_selecionada:
+                sucesso, _ = fazer_checkout(branch_selecionada)
+                atualizar_logs()
+                if sucesso:
+                    messagebox.showinfo("Checkout realizado", f"Branch selecionada com sucesso: {branch_selecionada}")
+                else:
+                    messagebox.showerror("Erro ao trocar de branch", "Erro ao executar o checkout.")
+            popup.destroy()
+
+        tk.Button(popup, text="OK", command=confirmar, width=10).pack(pady=10)
+
 
     construir_interface(
         janela, repo_var,
@@ -70,6 +119,8 @@ def iniciar_interface():
         acao_criar_branch,
         acao_commit,
         acao_commit_push,
+        acao_resolver_conflitos,
+        acao_checkout_branch,
         log_output
     )
 
