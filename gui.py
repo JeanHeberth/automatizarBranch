@@ -1,3 +1,5 @@
+import json
+import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
@@ -145,28 +147,6 @@ def iniciar_interface():
 
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
-    def acao_merge_para_principal():
-        branch_atual = get_current_branch()
-        if branch_atual != "develop":
-            messagebox.showwarning("Branch incorreta",
-                                   f"Você está em '{branch_atual}'. Altere para 'develop' para continuar.")
-            return
-
-        destino = simpledialog.askstring("Merge", "Deseja fazer merge para 'main' ou 'master'?")
-        if destino not in ["main", "master"]:
-            messagebox.showerror("Erro", "Destino inválido. Use 'main' ou 'master'.")
-            return
-
-        run_command(f"git checkout {destino}")
-        run_command(f"git pull origin {destino}")
-        stdout, stderr = run_command("git merge develop")
-        atualizar_logs()
-
-        if "Already up to date." in stdout or "Merge made" in stdout:
-            run_command(f"git push origin {destino}")
-            messagebox.showinfo("Merge", f"Merge concluído para '{destino}' e push realizado.")
-        else:
-            messagebox.showwarning("Atenção", f"Merge feito para '{destino}', revise conflitos se houver.")
 
     def acao_criar_pr():
         branches = listar_branches()
@@ -223,6 +203,36 @@ def iniciar_interface():
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
+
+    def editar_config_repositorio():
+        import json
+    from tkinter import simpledialog, messagebox
+    path = os.path.join(get_repo_path(), ".git-config.json")
+
+    if not os.path.exists(path):
+        messagebox.showwarning("Aviso", "Nenhum arquivo de configuração encontrado neste repositório.")
+        return
+
+    with open(path, "r") as f:
+        config = json.load(f)
+
+    usuario = simpledialog.askstring("Editar Usuário", "Digite seu nome de usuário no GitHub:", initialvalue=config.get("usuario", ""))
+    repositorio = simpledialog.askstring("Editar Repositório", "Digite o nome do repositório:", initialvalue=config.get("repositorio", ""))
+
+    if not usuario or not repositorio:
+        messagebox.showerror("Erro", "Campos obrigatórios.")
+        return
+
+    config["usuario"] = usuario
+    config["repositorio"] = repositorio
+
+    with open(path, "w") as f:
+        json.dump(config, f, indent=4)
+
+    messagebox.showinfo("Salvo", "Configuração atualizada com sucesso.")
+
+
+
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -233,9 +243,9 @@ def iniciar_interface():
         acao_resolver_conflitos,
         acao_checkout_branch,
         acao_deletar_branch,
-        acao_merge_para_principal,
         acao_criar_pr,
+        editar_config_repositorio,
         log_output
-    )
+)
 
     janela.mainloop()
