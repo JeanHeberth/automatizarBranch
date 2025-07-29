@@ -46,7 +46,7 @@ def push():
     run_command(f"git push origin {branch}")
     return True, f"Push feito para a branch {branch}."
 
-def atualizar_branch_principal():
+def atualizar_branch():
     branch_main = get_default_branch()
     if not branch_main:
         return False, "Não foi possível identificar a branch principal."
