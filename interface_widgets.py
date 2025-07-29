@@ -1,6 +1,6 @@
 def construir_interface(janela, repo_var, selecionar_repositorio, acao_atualizar_branch,
                         acao_criar_branch, acao_commit, acao_commit_push, acao_resolver_conflitos,
-                        acao_checkout_branch, acao_deletar_branch, acao_merge_para_principal, acao_criar_pr,
+                        acao_checkout_branch, acao_deletar_branch, acao_criar_pr,
                         log_output):
     import tkinter as tk
     tk.Label(janela, text="Repositório Git:").pack(pady=5)
@@ -14,7 +14,6 @@ def construir_interface(janela, repo_var, selecionar_repositorio, acao_atualizar
     tk.Button(janela, text="Resolver Conflitos", command=acao_resolver_conflitos, width=40).pack(pady=5)
     tk.Button(janela, text="Checkout de Branch", command=acao_checkout_branch, width=40).pack(pady=5)
     tk.Button(janela, text="Deletar Branch", command=acao_deletar_branch, width=40).pack(pady=5)
-    tk.Button(janela, text="Merge develop → main/master", command=acao_merge_para_principal, width=40).pack(pady=5)
     tk.Button(janela, text="Criar Pull Request", command=acao_criar_pr, width=40).pack(pady=5)
     tk.Button(janela, text="Sair", command=janela.quit, width=40).pack(pady=20)
 

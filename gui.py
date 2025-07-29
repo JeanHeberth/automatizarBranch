@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
-from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, fazer_checkout, get_current_branch
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch_principal, listar_branches, \
+    fazer_checkout, get_current_branch
 from interface_widgets import construir_interface
 
 
@@ -88,13 +89,13 @@ def iniciar_interface():
 
         tk.Button(popup, text="Atualizar", command=confirmar, width=10).pack(pady=10)
 
-
     def acao_resolver_conflitos():
         stdout, _ = run_command("git diff --name-only --diff-filter=U")
         arquivos_conflito = stdout.splitlines()
         atualizar_logs()
         if arquivos_conflito:
-            abrir = messagebox.askyesno("Conflitos detectados", f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
+            abrir = messagebox.askyesno("Conflitos detectados",
+                                        f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
             if abrir:
                 for arquivo in arquivos_conflito:
                     run_command(f"code {arquivo}")
@@ -168,45 +169,60 @@ def iniciar_interface():
 
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
-    def acao_merge_para_principal():
-        branch_atual = get_current_branch()
-        if branch_atual != "develop":
-            messagebox.showwarning("Branch incorreta", f"Você está em '{branch_atual}'. Altere para 'develop' para continuar.")
-            return
-
-        destino = simpledialog.askstring("Merge", "Deseja fazer merge para 'main' ou 'master'?")
-        if destino not in ["main", "master"]:
-            messagebox.showerror("Erro", "Destino inválido. Use 'main' ou 'master'.")
-            return
-
-        run_command(f"git checkout {destino}")
-        run_command(f"git pull origin {destino}")
-        stdout, stderr = run_command("git merge develop")
-        atualizar_logs()
-
-        if "Already up to date." in stdout or "Merge made" in stdout:
-            run_command(f"git push origin {destino}")
-            messagebox.showinfo("Merge", f"Merge concluído para '{destino}' e push realizado.")
-        else:
-            messagebox.showwarning("Atenção", f"Merge feito para '{destino}', revise conflitos se houver.")
-
     def acao_criar_pr():
-        origem = simpledialog.askstring("Criar PR", "Digite o nome da branch de origem:")
-        destino = simpledialog.askstring("Criar PR", "Digite o nome da branch de destino:")
-        if not origem or not destino:
-            messagebox.showerror("Erro", "Branch origem e destino são obrigatórias.")
+        branches = listar_branches()
+        if len(branches) < 2:
+            messagebox.showwarning("Aviso", "É necessário ter um repositório selecionado para criar um PR.")
             return
 
-        from utils import montar_url_pr
-        import webbrowser
+        popup = Toplevel()
+        popup.title("Criar Pull Request")
+        popup.geometry("450x200")
+        popup.grab_set()
 
-        url = montar_url_pr(origem, destino)
-        if url:
-            webbrowser.open(url)
-            messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+        tk.Label(popup, text="Selecione a branch BASE (para onde será feito o PR):").pack(pady=(10, 2))
+        base_var = tk.StringVar()
+        base_combo = ttk.Combobox(popup, textvariable=base_var, values=branches, state="readonly", width=50)
+        base_combo.pack(pady=5)
+        base_combo.set("main" if "main" in branches else branches[0])
+
+        tk.Label(popup, text="Selecione a branch COMPARE (de onde vem o PR):").pack(pady=(10, 2))
+        compare_var = tk.StringVar()
+        compare_combo = ttk.Combobox(popup, textvariable=compare_var, values=branches, state="readonly", width=50)
+        compare_combo.pack(pady=5)
+
+        # Sugestão automática: selecionar a branch atual como origem
+        from git_operations import get_current_branch
+        branch_atual = get_current_branch()
+        if branch_atual in branches:
+            compare_combo.set(branch_atual)
         else:
-            messagebox.showerror("Erro", "Não foi possível gerar a URL do PR.")
+            compare_combo.set(branches[-1])
 
+        def confirmar():
+            origem = compare_var.get()
+            destino = base_var.get()
+
+            if not origem or not destino:
+                messagebox.showerror("Erro", "Selecione as duas branches.")
+                return
+            if origem == destino:
+                messagebox.showerror("Erro", "Branches origem e destino devem ser diferentes.")
+                return
+
+            from utils import montar_url_pr
+            import webbrowser
+
+            url = montar_url_pr(origem, destino)
+            if url:
+                webbrowser.open(url)
+                messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+            else:
+                messagebox.showerror("Erro", "Não foi possível gerar a URL do PR.")
+
+            popup.destroy()
+
+        tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
     construir_interface(
         janela, repo_var,
@@ -218,7 +234,6 @@ def iniciar_interface():
         acao_resolver_conflitos,
         acao_checkout_branch,
         acao_deletar_branch,
-        acao_merge_para_principal,
         acao_criar_pr,
         log_output
     )
