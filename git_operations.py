@@ -37,7 +37,7 @@ def criar_branch(nome):
     return True, f"Branch '{feature_branch}' criada com sucesso."
 
 def fazer_commit(mensagem):
-    run_command("git add .")
+    run_command("git add -A")
     run_command(f'git commit -m "{mensagem}"')
     return True, "Commit realizado com sucesso."
 

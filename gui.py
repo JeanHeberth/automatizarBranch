@@ -172,10 +172,16 @@ def iniciar_interface():
             messagebox.showerror("Erro", "Branch origem e destino são obrigatórias.")
             return
 
-        url = f"https://github.com/seu-usuario/seu-repo/compare/{destino}...{origem}"
-        run_command(f"open {url}")  # macOS
-        # run_command(f"start {url}")  # Windows
-        messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+        from utils import montar_url_pr
+        import webbrowser
+
+        url = montar_url_pr(origem, destino)
+        if url:
+            webbrowser.open(url)
+            messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+        else:
+            messagebox.showerror("Erro", "Não foi possível gerar a URL do PR.")
+
 
     construir_interface(
         janela, repo_var,
