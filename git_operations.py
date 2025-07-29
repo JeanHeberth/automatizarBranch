@@ -55,6 +55,15 @@ def atualizar_branch():
     return True, f"Branch principal '{branch_main}' atualizada com sucesso."
 
 def listar_branches():
+    """
+    Retorna uma lista com o nome de todas as branches locais.
+
+    Executa o comando `git branch --list` e parseia o resultado,
+    retornando uma lista com os nomes de todas as branches locais
+    encontradas.
+    """
+    stdout, _ = run_command("git branch --list")
+    return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
     stdout, _ = run_command("git branch --list")
     return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
 
