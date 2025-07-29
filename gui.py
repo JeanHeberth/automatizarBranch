@@ -2,7 +2,7 @@ import json
 import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, \
     fazer_checkout, get_current_branch
 from interface_widgets import construir_interface
@@ -28,6 +28,8 @@ def iniciar_interface():
             repo_var.set(path)
             clear_logs()
             atualizar_logs()
+            get_repo_config()
+
 
     def acao_criar_branch():
         nome = simpledialog.askstring("Nome da Branch", "Digite o nome da nova branch:")
@@ -204,35 +206,6 @@ def iniciar_interface():
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
 
-    def editar_config_repositorio():
-        import json
-    from tkinter import simpledialog, messagebox
-    path = os.path.join(get_repo_path(), ".git-config.json")
-
-    if not os.path.exists(path):
-        messagebox.showwarning("Aviso", "Nenhum arquivo de configuração encontrado neste repositório.")
-        return
-
-    with open(path, "r") as f:
-        config = json.load(f)
-
-    usuario = simpledialog.askstring("Editar Usuário", "Digite seu nome de usuário no GitHub:", initialvalue=config.get("usuario", ""))
-    repositorio = simpledialog.askstring("Editar Repositório", "Digite o nome do repositório:", initialvalue=config.get("repositorio", ""))
-
-    if not usuario or not repositorio:
-        messagebox.showerror("Erro", "Campos obrigatórios.")
-        return
-
-    config["usuario"] = usuario
-    config["repositorio"] = repositorio
-
-    with open(path, "w") as f:
-        json.dump(config, f, indent=4)
-
-    messagebox.showinfo("Salvo", "Configuração atualizada com sucesso.")
-
-
-
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -244,7 +217,6 @@ def iniciar_interface():
         acao_checkout_branch,
         acao_deletar_branch,
         acao_criar_pr,
-        editar_config_repositorio,
         log_output
 )
 
