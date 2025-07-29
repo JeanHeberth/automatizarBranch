@@ -2,7 +2,7 @@ import json
 import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, \
     fazer_checkout, get_current_branch
 from interface_widgets import construir_interface
@@ -73,16 +73,54 @@ def iniciar_interface():
         stdout, _ = run_command("git diff --name-only --diff-filter=U")
         arquivos_conflito = stdout.splitlines()
         atualizar_logs()
-        if arquivos_conflito:
-            abrir = messagebox.askyesno("Conflitos detectados",
-                                        f"Foram encontrados {len(arquivos_conflito)} arquivos com conflito. Abrir no VSCode?")
-            if abrir:
-                for arquivo in arquivos_conflito:
-                    run_command(f"code {arquivo}")
-            else:
-                messagebox.showinfo("Info", "Após resolver os conflitos, execute 'git add' e 'git commit'.")
-        else:
+
+        if not arquivos_conflito:
             messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
+            return
+
+        # Cria popup com lista interativa
+        popup = Toplevel()
+        popup.title("Conflitos detectados")
+        popup.geometry("550x400")
+        popup.grab_set()
+
+        tk.Label(popup, text="Arquivos com conflito:").pack(pady=(10, 5))
+
+        lista = tk.Listbox(popup, selectmode=tk.MULTIPLE, width=70, height=12)
+        for arquivo in arquivos_conflito:
+            lista.insert(tk.END, arquivo)
+        lista.pack(pady=10)
+
+        def abrir_selecionados():
+            selecionados = [lista.get(i) for i in lista.curselection()]
+            if not selecionados:
+                messagebox.showinfo("Aviso", "Nenhum arquivo selecionado.")
+                return
+            for arquivo in selecionados:
+                run_command(f"code {arquivo}")
+            log(f"Abrindo arquivos com conflito: {', '.join(selecionados)}")
+            messagebox.showinfo("Info", "Arquivos abertos no VS Code.")
+            popup.destroy()
+
+        def executar_git_status():
+            output, _ = run_command("git status")
+            atualizar_logs()
+            messagebox.showinfo("Git Status", output)
+
+        def finalizar_conflitos():
+            confirm = messagebox.askyesno("Finalizar", "Deseja executar:\n\n  git add .\n  git commit -m 'Resolvendo conflitos'?")
+            if confirm:
+                run_command("git add .")
+                run_command("git commit -m 'Resolvendo conflitos'")
+                atualizar_logs()
+                messagebox.showinfo("Sucesso", "Conflitos resolvidos e commit realizado.")
+                popup.destroy()
+
+        # Botões
+        tk.Button(popup, text="Abrir Selecionados no VS Code", command=abrir_selecionados, width=40).pack(pady=(5, 5))
+        tk.Button(popup, text="Executar git status", command=executar_git_status, width=40).pack(pady=5)
+        tk.Button(popup, text="Finalizar Conflitos (add + commit)", command=finalizar_conflitos, width=40).pack(pady=5)
+
 
     def acao_checkout_branch():
         branches = listar_branches()
