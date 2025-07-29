@@ -62,12 +62,14 @@ def iniciar_interface():
         messagebox.showinfo("Push", output)
 
     def acao_atualizar_branch():
-        sucesso, msg = atualizar_branch()
-        atualizar_logs()
-        if sucesso:
-            messagebox.showinfo("Atualização", msg)
-        else:
-            messagebox.showerror("Erro", msg)
+        resultado = atualizar_branch()
+        if resultado:
+            sucesso, msg = resultado
+            if sucesso:
+               messagebox.showinfo("Atualização", msg)
+            else:
+                messagebox.showerror("Erro", msg)
+                atualizar_logs()
 
     def acao_resolver_conflitos():
         stdout, _ = run_command("git diff --name-only --diff-filter=U")
@@ -259,3 +261,5 @@ def iniciar_interface():
 )
 
     janela.mainloop()
+
+

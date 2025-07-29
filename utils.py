@@ -18,6 +18,8 @@ def get_repo_path():
 import json
 
 
+import json
+
 def get_repo_config():
     config_path = os.path.join(get_repo_path(), ".git-config.json")
     if os.path.exists(config_path):
@@ -38,6 +40,12 @@ def get_repo_config():
         json.dump(config, f, indent=4)
 
     return config
+
+def montar_url_pr(origem, destino):
+    cfg = get_repo_config()
+    if not cfg:
+        return None
+    return f"https://github.com/{cfg['usuario']}/{cfg['repositorio']}/compare/{destino}...{origem}"
 
 
 def montar_url_pr(origem, destino):

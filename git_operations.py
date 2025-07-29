@@ -1,3 +1,8 @@
+from tkinter import Toplevel
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+
 from utils import run_command, get_repo_path, log
 import os
 
@@ -47,23 +52,40 @@ def push():
     return True, f"Push feito para a branch {branch}."
 
 def atualizar_branch():
-    branch_main = get_default_branch()
-    if not branch_main:
-        return False, "Não foi possível identificar a branch principal."
-    run_command(f"git checkout {branch_main}")
-    run_command(f"git pull origin {branch_main}")
-    return True, f"Branch principal '{branch_main}' atualizada com sucesso."
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Atualizar Branch")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch para atualizar:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch = branch_var.get()
+            listar_branches()
+            popup.destroy()
+            if branch:
+                run_command(f"git checkout {branch}")
+                stdout, stderr = run_command(f"git pull origin {branch}")
+
+                if stderr:
+                    messagebx.showerror("Erro", stderr)
+                else:
+                    messagebox.showinfo("Atualizado", f"Branch '{branch}' atualizada com sucesso.")
+
+        tk.Button(popup, text="Atualizar", command=confirmar, width=10).pack(pady=10)
+
 
 def listar_branches():
-    """
-    Retorna uma lista com o nome de todas as branches locais.
-
-    Executa o comando `git branch --list` e parseia o resultado,
-    retornando uma lista com os nomes de todas as branches locais
-    encontradas.
-    """
-    stdout, _ = run_command("git branch --list")
-    return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
     stdout, _ = run_command("git branch --list")
     return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
 
