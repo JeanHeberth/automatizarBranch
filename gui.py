@@ -56,13 +56,38 @@ def iniciar_interface():
         atualizar_logs()
         messagebox.showinfo("Push", output)
 
-    def acao_atualizar_branch_principal():
-        sucesso, msg = atualizar_branch_principal()
-        atualizar_logs()
-        if sucesso:
-            messagebox.showinfo("Atualização", msg)
-        else:
-            messagebox.showerror("Erro", msg)
+    def acao_atualizar_branch():
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Atualizar Branch")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch para atualizar:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch = branch_var.get()
+            popup.destroy()
+            if branch:
+                run_command(f"git checkout {branch}")
+                stdout, stderr = run_command(f"git pull origin {branch}")
+                atualizar_logs()
+                if stderr:
+                    messagebox.showerror("Erro", stderr)
+                else:
+                    messagebox.showinfo("Atualizado", f"Branch '{branch}' atualizada com sucesso.")
+
+        tk.Button(popup, text="Atualizar", command=confirmar, width=10).pack(pady=10)
+
 
     def acao_resolver_conflitos():
         stdout, _ = run_command("git diff --name-only --diff-filter=U")
@@ -186,7 +211,7 @@ def iniciar_interface():
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
-        acao_atualizar_branch_principal,
+        acao_atualizar_branch,
         acao_criar_branch,
         acao_commit,
         acao_commit_push,
