@@ -249,7 +249,6 @@ def iniciar_interface():
                 messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
             else:
                 messagebox.showerror("Erro", "Não foi possível gerar a URL do PR.")
-
             popup.destroy()
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
