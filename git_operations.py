@@ -97,13 +97,14 @@ def listar_branches():
 def fazer_checkout(branch_nome):
     stdout, stderr = run_command(f"git checkout {branch_nome}")
     saida_total = f"{stdout}\n{stderr}".lower()
-
     sucesso = (
             "switched to" in saida_total or
-            "already on" in saida_total
+            "already on" in saida_total or
+            "up to date" in saida_total  # nova condição aceita como sucesso
     )
+    return sucesso, stdout or stderr  # também inverte a ordem para mostrar saída útil
 
-    return sucesso, stderr or stdout
+
 
 
 def deletar_branches_locais_com_verificacao():

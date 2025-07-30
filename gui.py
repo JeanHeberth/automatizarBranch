@@ -55,10 +55,15 @@ def iniciar_interface():
             messagebox.showinfo("Sucesso", output)
 
     def acao_commit_push():
-        acao_commit()
-        _, output = push()
-        atualizar_logs()
-        messagebox.showinfo("Push", output)
+        mensagem = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
+        if mensagem is None or mensagem.strip() == "":
+            return
+
+            fazer_commit(mensagem)
+            fazer_push()
+            atualizar_logs()
+            branch = get_branch_atual()
+            messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
 
     def acao_atualizar_branch():
         resultado = atualizar_branch()
