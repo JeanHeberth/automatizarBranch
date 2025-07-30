@@ -1,12 +1,12 @@
+#### GUI #######
+
 import json
 import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
-from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, \
-    fazer_checkout, get_current_branch
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, get_current_branch, deletar_branches_locais_com_verificacao, deletar_branch_remota
 from interface_widgets import construir_interface
-
 
 def iniciar_interface():
     clear_logs()
@@ -29,7 +29,6 @@ def iniciar_interface():
             clear_logs()
             atualizar_logs()
             get_repo_config()
-
 
     def acao_criar_branch():
         nome = simpledialog.askstring("Nome da Branch", "Digite o nome da nova branch:")
@@ -66,7 +65,7 @@ def iniciar_interface():
         if resultado:
             sucesso, msg = resultado
             if sucesso:
-               messagebox.showinfo("Atualização", msg)
+                messagebox.showinfo("Atualização", msg)
             else:
                 messagebox.showerror("Erro", msg)
                 atualizar_logs()
@@ -80,7 +79,6 @@ def iniciar_interface():
             messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
             return
 
-        # Cria popup com lista interativa
         popup = Toplevel()
         popup.title("Conflitos detectados")
         popup.geometry("550x400")
@@ -118,11 +116,9 @@ def iniciar_interface():
                 messagebox.showinfo("Sucesso", "Conflitos resolvidos e commit realizado.")
                 popup.destroy()
 
-        # Botões
         tk.Button(popup, text="Abrir Selecionados no VS Code", command=abrir_selecionados, width=40).pack(pady=(5, 5))
         tk.Button(popup, text="Executar git status", command=executar_git_status, width=40).pack(pady=5)
         tk.Button(popup, text="Finalizar Conflitos (add + commit)", command=finalizar_conflitos, width=40).pack(pady=5)
-
 
     def acao_checkout_branch():
         branches = listar_branches()
@@ -189,6 +185,20 @@ def iniciar_interface():
 
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
+    def acao_deletar_branches_locais():
+        resultado = deletar_branches_locais_com_verificacao()
+        atualizar_logs()
+        messagebox.showinfo("Branches Locais", resultado)
+
+    def acao_deletar_branch_remota(branch):
+        if branch:
+            sucesso, mensagem = deletar_branch_remota(branch)
+            atualizar_logs()
+            if sucesso:
+                messagebox.showinfo("Branch Remota Deletada", mensagem)
+            else:
+                messagebox.showwarning("Aviso", mensagem)
+            return sucesso, mensagem
 
     def acao_criar_pr():
         branches = listar_branches()
@@ -212,7 +222,6 @@ def iniciar_interface():
         compare_combo = ttk.Combobox(popup, textvariable=compare_var, values=branches, state="readonly", width=50)
         compare_combo.pack(pady=5)
 
-        # Sugestão automática: selecionar a branch atual como origem
         from git_operations import get_current_branch
         branch_atual = get_current_branch()
         if branch_atual in branches:
@@ -245,7 +254,6 @@ def iniciar_interface():
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
-
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -257,9 +265,9 @@ def iniciar_interface():
         acao_checkout_branch,
         acao_deletar_branch,
         acao_criar_pr,
+        acao_deletar_branches_locais,
+        acao_deletar_branch_remota,
         log_output
-)
+    )
 
     janela.mainloop()
-
-
