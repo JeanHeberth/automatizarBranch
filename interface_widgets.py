@@ -9,7 +9,7 @@ def construir_interface(janela, repo_var, selecionar_repositorio, acao_atualizar
 
     tk.Button(janela, text="Atualizar Branch", command=acao_atualizar_branch_principal, width=40).pack(pady=5)
     tk.Button(janela, text="Checkout de Branch", command=acao_checkout_branch, width=40).pack(pady=5)
-    tk.Button(janela, text="Criar Branch (feature/)", command=acao_criar_branch, width=40).pack(pady=5)
+    tk.Button(janela, text="Criar Branch", command=acao_criar_branch, width=40).pack(pady=5)
     tk.Button(janela, text="Fazer Commit", command=acao_commit, width=40).pack(pady=5)
     tk.Button(janela, text="Commit + Push", command=acao_commit_push, width=40).pack(pady=5)
     tk.Button(janela, text="Criar Pull Request", command=acao_criar_pr, width=40).pack(pady=5)
