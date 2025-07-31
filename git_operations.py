@@ -59,10 +59,12 @@ def fazer_commit(mensagem):
     return True, stdout or "Commit realizado com sucesso."
 
 def push():
-    stdout, stderr = run_command("git push")
+    branch = get_branch_atual()
+    stdout, stderr = run_command(f"git push origin {branch}")
+
     if stderr:
-     return False, stderr
-    return True, stdout or "Push realizado com sucesso."
+        return False, stderr
+    return True, stdout or f"Push realizado com sucesso para {branch}."
 
 def atualizar_branch():
     branches = listar_branches()
