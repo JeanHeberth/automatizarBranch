@@ -71,7 +71,6 @@ def push():
     if stderr:
         return False, stderr
     return True, stdout or "Push realizado com sucesso."
-
 def atualizar_branch():
     branches = listar_branches()
     if not branches:

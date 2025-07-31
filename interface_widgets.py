@@ -40,6 +40,12 @@ def criar_toplevel_deletar_branch_remota(callback):
 
     tk.Label(popup, text="Selecione a branch remota para deletar:").pack(pady=10)
 
+
+
+####TESTANDO AQUI mais aqui
+
+
+
     branch_var = tk.StringVar()
     combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
     combo.pack(pady=5)
