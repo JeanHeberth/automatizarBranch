@@ -46,16 +46,24 @@ def criar_branch(nome):
 
 
 def fazer_commit(mensagem):
-    run_command("git add -A")
-    run_command(f'git commit -m "{mensagem}"')
-    return True, "Commit realizado com sucesso."
+    from utils import run_command
 
+    run_command("git add -A")
+    stdout, stderr = run_command(f'git commit -m "{mensagem}"')
+
+    if "nothing to commit" in (stdout + stderr).lower():
+        return False, "Nenhuma modificação para commit."
+
+    if stderr:
+        return False, stderr
+
+    return True, stdout or "Commit realizado com sucesso."
 
 def push():
-    branch = get_current_branch()
-    run_command(f"git push origin {branch}")
-    return True, f"Push feito para a branch {branch}."
-
+    stdout, stderr = run_command("git push")
+    if stderr:
+     return False, stderr
+    return True, stdout or "Push realizado com sucesso."
 
 def atualizar_branch():
     branches = listar_branches()
