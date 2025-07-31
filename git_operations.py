@@ -59,13 +59,18 @@ def fazer_commit(mensagem):
     return True, stdout or "Commit realizado com sucesso."
 
 def push():
-    branch = get_branch_atual()
-    stdout, stderr = run_command(f"git push origin {branch}")
+    branch_atual, _ = run_command("git rev-parse --abbrev-ref HEAD")
+
+    # Tenta fazer push normalmente
+    stdout, stderr = run_command("git push")
+
+    # Se falhar por ausência de upstream, faz push com -u
+    if "set upstream" in stderr.lower() or "no upstream" in stderr.lower():
+        stdout, stderr = run_command(f"git push -u origin {branch_atual.strip()}")
 
     if stderr:
         return False, stderr
-    return True, stdout or f"Push realizado com sucesso para {branch}."
-
+    return True, stdout or "Push realizado com sucesso."
 def atualizar_branch():
     branches = listar_branches()
     if not branches:
