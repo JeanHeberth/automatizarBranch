@@ -75,7 +75,7 @@ def iniciar_interface():
         sucesso_push, msg_push = push()
         if not sucesso_push:
             messagebox.showerror("Erro ao fazer push", msg_push)
-        return
+            return
 
         branch = get_branch_atual()
         atualizar_logs()
