@@ -51,9 +51,12 @@ def iniciar_interface():
             return
         msg = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
         if msg:
-            _, output = fazer_commit(msg)
-            atualizar_logs()
-            messagebox.showinfo("Sucesso", output)
+            sucesso_commit, msg_commit = fazer_commit(msg)
+            if sucesso_commit:
+               atualizar_logs()
+               messagebox.showinfo("Sucesso", msg_commit)
+            else:
+                messagebox.showerror("Erro ao fazer commit", msg_commit)
 
     def acao_commit_push():
         mensagem = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
@@ -64,19 +67,19 @@ def iniciar_interface():
         sucesso_commit, msg_commit = fazer_commit(mensagem)
         if not sucesso_commit:
             if "nenhuma modificação" in msg_commit.lower():
-             messagebox.showinfo("Info", msg_commit)
-        else:
-            messagebox.showerror("Erro ao fazer commit", msg_commit)
-        return
+                messagebox.showinfo("Info", msg_commit)
+            else:
+                messagebox.showerror("Erro ao fazer commit", msg_commit)
+            return
 
         sucesso_push, msg_push = push()
         if not sucesso_push:
             messagebox.showerror("Erro ao fazer push", msg_push)
-        return
+            return
 
-        branch = get_branch_atual()
+        branch = get_current_branch()
         atualizar_logs()
-        print(f"[LOG] Push feito para a branch {branch}: {msg_push}")
+        print(f"Push feito para a branch {branch}: {msg_push}")
         messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
 
 
