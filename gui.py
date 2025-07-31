@@ -79,7 +79,7 @@ def iniciar_interface():
 
         branch = get_current_branch()
         atualizar_logs()
-        print(f"[LOG] Push feito para a branch {branch}: {msg_push}")
+        print(f"Push feito para a branch {branch}: {msg_push}")
         messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
 
 
