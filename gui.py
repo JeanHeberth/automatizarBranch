@@ -1,12 +1,13 @@
 #### GUI #######
 
-import json
-import os
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
-from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
-from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, get_current_branch, deletar_branches_locais_com_verificacao, deletar_branch_remota
+
+from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
+    get_current_branch, deletar_branches_locais_com_verificacao, deletar_branch_remota
 from interface_widgets import construir_interface
+from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
+
 
 def iniciar_interface():
     clear_logs()
@@ -57,13 +58,29 @@ def iniciar_interface():
     def acao_commit_push():
         mensagem = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
         if mensagem is None or mensagem.strip() == "":
+            messagebox.showinfo("Cancelado", "Commit cancelado.")
             return
 
-            fazer_commit(mensagem)
-            fazer_push()
-            atualizar_logs()
-            branch = get_branch_atual()
-            messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
+        sucesso_commit, msg_commit = fazer_commit(mensagem)
+        if not sucesso_commit:
+            if "nenhuma modificação" in msg_commit.lower():
+             messagebox.showinfo("Info", msg_commit)
+        else:
+            messagebox.showerror("Erro ao fazer commit", msg_commit)
+        return
+
+        sucesso_push, msg_push = push()
+        if not sucesso_push:
+            messagebox.showerror("Erro ao fazer push", msg_push)
+        return
+
+        branch = get_branch_atual()
+        atualizar_logs()
+        print(f"[LOG] Push feito para a branch {branch}: {msg_push}")
+        messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
+
+
+
 
     def acao_atualizar_branch():
         resultado = atualizar_branch()
@@ -73,7 +90,7 @@ def iniciar_interface():
                 messagebox.showinfo("Atualização", msg)
             else:
                 messagebox.showerror("Erro", msg)
-                atualizar_logs()
+    atualizar_logs()
 
     def acao_resolver_conflitos():
         stdout, _ = run_command("git diff --name-only --diff-filter=U")
