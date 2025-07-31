@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
-    get_current_branch, deletar_branches_locais_com_verificacao, deletar_branch_remota
+    get_current_branch, deletar_branches_locais, deletar_branch_remota
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -211,7 +211,7 @@ def iniciar_interface():
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
 
     def acao_deletar_branches_locais():
-        resultado = deletar_branches_locais_com_verificacao()
+        resultado = deletar_branches_locais()
         atualizar_logs()
         messagebox.showinfo("Branches Locais", resultado)
 

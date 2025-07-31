@@ -120,12 +120,9 @@ def fazer_checkout(branch):
 
 
 
-def deletar_branches_locais_com_verificacao():
+def deletar_branches_locais():
     stdout, _ = run_command("git branch")
     all_branches = [b.strip("* ").strip() for b in stdout.splitlines()]
-
-    stdout, _ = run_command("git branch --merged")
-    merged_branches = [b.strip("* ").strip() for b in stdout.splitlines()]
 
     protegidas = {"main", "master", "develop"}
     mensagens = []
@@ -133,11 +130,10 @@ def deletar_branches_locais_com_verificacao():
     for branch in all_branches:
         if branch in protegidas:
             continue
-        if branch in merged_branches:
-            out, err = run_command(f"git branch -d {branch}")
-            mensagens.append(f"✅ {branch} deletada." if not err else f"⚠️ Erro ao deletar {branch}: {err}")
-        else:
-            mensagens.append(f"⛔ {branch} não foi mergeada. Não deletada.")
+        out, err = run_command(f"git branch -D {branch}")
+        mensagens.append(
+            f"✅ {branch} deletada." if not err else f"⚠️ Erro ao deletar {branch}: {err}"
+        )
 
     return "\n".join(mensagens)
 
