@@ -1,10 +1,9 @@
-####### git_operations ############
 
-from tkinter import Toplevel
 import tkinter as tk
+from tkinter import Toplevel
 from tkinter import ttk, messagebox
-from utils import run_command, get_repo_path, log
-import os
+
+from utils import run_command
 
 
 def get_default_branch():
@@ -46,16 +45,24 @@ def criar_branch(nome):
 
 
 def fazer_commit(mensagem):
-    run_command("git add -A")
-    run_command(f'git commit -m "{mensagem}"')
-    return True, "Commit realizado com sucesso."
+    from utils import run_command
 
+    run_command("git add -A")
+    stdout, stderr = run_command(f'git commit -m "{mensagem}"')
+
+    if "nothing to commit" in (stdout + stderr).lower():
+        return False, "Nenhuma modificação para commit."
+
+    if stderr:
+        return False, stderr
+
+    return True, stdout or "Commit realizado com sucesso."
 
 def push():
-    branch = get_current_branch()
-    run_command(f"git push origin {branch}")
-    return True, f"Push feito para a branch {branch}."
-
+    stdout, stderr = run_command("git push")
+    if stderr:
+     return False, stderr
+    return True, stdout or "Push realizado com sucesso."
 
 def atualizar_branch():
     branches = listar_branches()
@@ -94,15 +101,14 @@ def listar_branches():
     return [linha.strip().lstrip("* ") for linha in stdout.splitlines() if linha.strip()]
 
 
-def fazer_checkout(branch_nome):
-    stdout, stderr = run_command(f"git checkout {branch_nome}")
-    saida_total = f"{stdout}\n{stderr}".lower()
-    sucesso = (
-            "switched to" in saida_total or
-            "already on" in saida_total or
-            "up to date" in saida_total  # nova condição aceita como sucesso
-    )
-    return sucesso, stdout or stderr  # também inverte a ordem para mostrar saída útil
+def fazer_checkout(branch):
+    out, err = run_command(f"git checkout {branch}")
+
+    if "error" in out.lower() or "fatal" in out.lower() or err:
+        return False, f"Erro ao trocar para a branch '{branch}'. Saída: {out or err}"
+
+    return True, f"Checkout realizado com sucesso para '{branch}'"
+
 
 
 
