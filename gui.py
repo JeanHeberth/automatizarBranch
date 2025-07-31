@@ -77,7 +77,7 @@ def iniciar_interface():
             messagebox.showerror("Erro ao fazer push", msg_push)
             return
 
-        branch = get_branch_atual()
+        branch = get_current_branch()
         atualizar_logs()
         print(f"[LOG] Push feito para a branch {branch}: {msg_push}")
         messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
