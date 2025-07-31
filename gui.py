@@ -51,9 +51,12 @@ def iniciar_interface():
             return
         msg = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
         if msg:
-            _, output = fazer_commit(msg)
-            atualizar_logs()
-            messagebox.showinfo("Sucesso", output)
+            sucesso_commit, msg_commit = fazer_commit(msg)
+            if sucesso_commit:
+               atualizar_logs()
+               messagebox.showinfo("Sucesso", msg_commit)
+            else:
+                messagebox.showerror("Erro ao fazer commit", msg_commit)
 
     def acao_commit_push():
         mensagem = simpledialog.askstring("Mensagem do Commit", "Digite a mensagem do commit:")
@@ -64,10 +67,10 @@ def iniciar_interface():
         sucesso_commit, msg_commit = fazer_commit(mensagem)
         if not sucesso_commit:
             if "nenhuma modificação" in msg_commit.lower():
-             messagebox.showinfo("Info", msg_commit)
-        else:
-            messagebox.showerror("Erro ao fazer commit", msg_commit)
-        return
+                messagebox.showinfo("Info", msg_commit)
+            else:
+                messagebox.showerror("Erro ao fazer commit", msg_commit)
+            return
 
         sucesso_push, msg_push = push()
         if not sucesso_push:
