@@ -219,7 +219,6 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-
     payload = {
         "title": titulo,
         "body": corpo,
@@ -268,3 +267,4 @@ def merge_pull_request(numero_pr):
     else:
         erro = response.json().get("message", "Erro desconhecido")
         return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: {erro}"
+
