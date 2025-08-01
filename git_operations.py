@@ -1,10 +1,6 @@
-import os
-import tkinter as tk
 from tkinter import Toplevel
-from tkinter import ttk, messagebox
-from dotenv import load_dotenv
-import requests
-
+from tkinter import Toplevel
+from tkinter import ttk
 
 from utils import run_command
 
@@ -199,7 +195,15 @@ def deletar_branch_remota(branch):
     return False, f"Branch '{branch}' não existe remotamente."
 
 
+import os
+import requests
+from dotenv import load_dotenv
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+
+# Carrega variáveis do .env
 load_dotenv()
+
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_OWNER = "JeanHeberth"  # Substitua pelo seu usuário
@@ -226,7 +230,57 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
     response = requests.post(url, headers=headers, json=payload)
 
     if response.status_code == 201:
-        return True, f"✅ Pull Request criado: {response.json().get('html_url')}"
+        pr_url = response.json().get('html_url')
+        pr_number = response.json().get('number')
+        merge_ok, merge_msg = merge_pull_request(pr_number)
+        if merge_ok:
+            return True, f"✅ Pull Request criado e mergeado automaticamente: {pr_url}"
+        else:
+            return False, f"✅ Pull Request criado: {pr_url}, mas falha ao fazer merge: {merge_msg}"
     else:
         erro = response.json().get("message", "Erro desconhecido")
-        return False, f"❌ Erro ao criar PR: {erro}"
+        detalhes = response.json().get("errors", [])
+        detalhes_msg = f"\nDetalhes: {detalhes}" if detalhes else ""
+        return False, f"❌ Erro ao criar PR: {erro}.{detalhes_msg}"
+
+
+def merge_pull_request(numero_pr):
+    if not GITHUB_TOKEN:
+        return False, "Token do GitHub não encontrado."
+
+    url = f"{GITHUB_API_URL}/repos/{REPO_OWNER}/{REPO_NAME}/pulls/{numero_pr}/merge"
+
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    response = requests.put(url, headers=headers)
+
+    if response.status_code == 200:
+        return True, f"✅ Pull Request #{numero_pr} mergeado com sucesso."
+    else:
+        erro = response.json().get("message", "Erro desconhecido")
+        return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: {erro}"
+
+
+def acao_merge_pull_request():
+    numero = simpledialog.askstring("Número do PR", "Digite o número do Pull Request para fazer merge:")
+    if not numero:
+        return
+    try:
+        numero = int(numero)
+    except ValueError:
+        messagebox.showerror("Erro", "Número do PR inválido.")
+        return
+
+    sucesso, mensagem = merge_pull_request(numero)
+    if sucesso:
+        messagebox.showinfo("Sucesso", mensagem)
+    else:
+        messagebox.showerror("Erro", mensagem)
+
+
+def adicionar_botao_merge(janela):
+    btn_merge_pr = tk.Button(janela, text="Merge Pull Request", command=acao_merge_pull_request)
+    btn_merge_pr.pack(pady=5)
