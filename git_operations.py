@@ -206,6 +206,7 @@ REPO_OWNER = "JeanHeberth"  # Substitua pelo seu usuário
 REPO_NAME = "automatizarBranch"  # Substitua pelo nome do seu repositório
 
 def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", corpo="PR criado automaticamente"):
+
     if not GITHUB_TOKEN:
         return False, "Token do GitHub não encontrado."
 
@@ -226,7 +227,9 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
     response = requests.post(url, headers=headers, json=payload)
 
     if response.status_code == 201:
-        return True, f"✅ Pull Request criado: {response.json().get('html_url')}"
+        return True, f"\u2705 Pull Request criado: {response.json().get('html_url')}"
     else:
         erro = response.json().get("message", "Erro desconhecido")
-        return False, f"❌ Erro ao criar PR: {erro}"
+        detalhes = response.json().get("errors", [])
+        detalhes_msg = f"\nDetalhes: {detalhes}" if detalhes else ""
+        return False, f"❌ Erro ao criar PR: {erro}.{detalhes_msg}"

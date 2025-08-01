@@ -232,7 +232,7 @@ def iniciar_interface():
 
         popup = Toplevel()
         popup.title("Criar Pull Request")
-        popup.geometry("950x250")
+        popup.geometry("500x350")
         popup.grab_set()
 
         tk.Label(popup, text="Selecione a branch BASE (para onde será feito o PR):").pack(pady=(10, 2))
