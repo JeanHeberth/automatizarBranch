@@ -2,9 +2,8 @@
 
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
-
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
-    get_current_branch, deletar_branches_locais, deletar_branch_remota
+    get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -226,9 +225,6 @@ def iniciar_interface():
             return sucesso, mensagem
 
     def acao_criar_pr():
-        from git_operations import criar_pull_request
-        from git_operations import listar_branches
-
         branches = listar_branches()
         if len(branches) < 2:
             messagebox.showwarning("Aviso", "É necessário ter pelo menos duas branches para criar um PR.")
@@ -236,7 +232,7 @@ def iniciar_interface():
 
         popup = Toplevel()
         popup.title("Criar Pull Request")
-        popup.geometry("450x250")
+        popup.geometry("950x250")
         popup.grab_set()
 
         tk.Label(popup, text="Selecione a branch BASE (para onde será feito o PR):").pack(pady=(10, 2))
