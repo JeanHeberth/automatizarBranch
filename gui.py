@@ -226,6 +226,9 @@ def iniciar_interface():
             return sucesso, mensagem
 
     def acao_criar_pr():
+        from git_operations import criar_pull_request
+        from git_operations import listar_branches
+
         branches = listar_branches()
         if len(branches) < 2:
             messagebox.showwarning("Aviso", "É necessário ter pelo menos duas branches para criar um PR.")
@@ -233,7 +236,7 @@ def iniciar_interface():
 
         popup = Toplevel()
         popup.title("Criar Pull Request")
-        popup.geometry("450x200")
+        popup.geometry("450x250")
         popup.grab_set()
 
         tk.Label(popup, text="Selecione a branch BASE (para onde será feito o PR):").pack(pady=(10, 2))
@@ -254,9 +257,15 @@ def iniciar_interface():
         else:
             compare_combo.set(branches[-1])
 
+        tk.Label(popup, text="Título do PR:").pack(pady=(10, 2))
+        titulo_var = tk.StringVar(value="Novo Pull Request")
+        titulo_entry = tk.Entry(popup, textvariable=titulo_var, width=50)
+        titulo_entry.pack(pady=5)
+
         def confirmar():
             origem = compare_var.get()
             destino = base_var.get()
+            titulo = titulo_var.get()
 
             if not origem or not destino:
                 messagebox.showerror("Erro", "Selecione as duas branches.")
@@ -265,15 +274,12 @@ def iniciar_interface():
                 messagebox.showerror("Erro", "Branches origem e destino devem ser diferentes.")
                 return
 
-            from utils import montar_url_pr
-            import webbrowser
-
-            url = montar_url_pr(origem, destino)
-            if url:
-                webbrowser.open(url)
-                messagebox.showinfo("Pull Request", f"PR aberto no navegador: {url}")
+            sucesso, msg = criar_pull_request(origem, destino, titulo)
+            if sucesso:
+                messagebox.showinfo("PR Criado", msg)
             else:
-                messagebox.showerror("Erro", "Não foi possível gerar a URL do PR.")
+                messagebox.showerror("Erro ao criar PR", msg)
+
             popup.destroy()
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
