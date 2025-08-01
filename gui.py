@@ -299,11 +299,6 @@ def iniciar_interface():
             messagebox.showerror("Erro", mensagem)
 
 
-    def adicionar_botao_merge(janela):
-        btn_merge_pr = tk.Button(janela, text="Merge Pull Request", command=acao_merge_pull_request)
-        btn_merge_pr.pack(pady=5)
-
-
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -320,5 +315,4 @@ def iniciar_interface():
         # acao_merge_pull_request,
         log_output
     )
-    adicionar_botao_merge(janela)
     janela.mainloop()
