@@ -313,11 +313,11 @@ def iniciar_interface():
         acao_commit_push,
         acao_resolver_conflitos,
         acao_checkout_branch,
-        acao_deletar_branch,
+        # acao_deletar_branch,
         acao_criar_pr,
         acao_deletar_branches_locais,
         acao_deletar_branch_remota,
-        acao_merge_pull_request,
+        # acao_merge_pull_request,
         log_output
     )
     adicionar_botao_merge(janela)
