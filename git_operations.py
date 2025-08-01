@@ -206,6 +206,7 @@ REPO_OWNER = "JeanHeberth"  # Substitua pelo seu usuário
 REPO_NAME = "automatizarBranch"  # Substitua pelo nome do seu repositório
 
 def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", corpo="PR criado automaticamente"):
+
     if not GITHUB_TOKEN:
         return False, "Token do GitHub não encontrado."
 
