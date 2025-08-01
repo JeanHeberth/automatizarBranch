@@ -2,9 +2,10 @@
 
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
+
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
     get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request, \
-    deletar_branch_remota_com_mensagem
+    deletar_branch_remota_com_mensagem, merge_pull_request, adicionar_botao_merge
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -53,8 +54,8 @@ def iniciar_interface():
         if msg:
             sucesso_commit, msg_commit = fazer_commit(msg)
             if sucesso_commit:
-               atualizar_logs()
-               messagebox.showinfo("Sucesso", msg_commit)
+                atualizar_logs()
+                messagebox.showinfo("Sucesso", msg_commit)
             else:
                 messagebox.showerror("Erro ao fazer commit", msg_commit)
 
@@ -82,9 +83,6 @@ def iniciar_interface():
         print(f"Push feito para a branch {branch}: {msg_push}")
         messagebox.showinfo("Sucesso", f"Push feito para a branch {branch}.")
 
-
-
-
     def acao_atualizar_branch():
         resultado = atualizar_branch()
         if resultado:
@@ -93,6 +91,7 @@ def iniciar_interface():
                 messagebox.showinfo("Atualização", msg)
             else:
                 messagebox.showerror("Erro", msg)
+
     atualizar_logs()
 
     def acao_resolver_conflitos():
@@ -133,7 +132,8 @@ def iniciar_interface():
             messagebox.showinfo("Git Status", output)
 
         def finalizar_conflitos():
-            confirm = messagebox.askyesno("Finalizar", "Deseja executar:\n\n  git add .\n  git commit -m 'Resolvendo conflitos'?")
+            confirm = messagebox.askyesno("Finalizar",
+                                          "Deseja executar:\n\n  git add .\n  git commit -m 'Resolvendo conflitos'?")
             if confirm:
                 run_command("git add .")
                 run_command("git commit -m 'Resolvendo conflitos'")
@@ -280,6 +280,21 @@ def iniciar_interface():
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
+    def acao_merge_pull_request():
+        numero = simpledialog.askstring("Número do PR", "Digite o número do Pull Request para fazer merge:")
+        if not numero:
+            return
+        try:
+            numero = int(numero)
+        except ValueError:
+            messagebox.showerror("Erro", "Número do PR inválido.")
+            return
+        sucesso, mensagem = merge_pull_request(numero)
+        if sucesso:
+            messagebox.showinfo("Sucesso", mensagem)
+        else:
+            messagebox.showerror("Erro", mensagem)
+
     construir_interface(
         janela, repo_var,
         selecionar_repositorio,
@@ -293,7 +308,8 @@ def iniciar_interface():
         acao_criar_pr,
         acao_deletar_branches_locais,
         acao_deletar_branch_remota,
+        acao_merge_pull_request,
         log_output
     )
-
+    adicionar_botao_merge(janela)
     janela.mainloop()
