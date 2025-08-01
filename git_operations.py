@@ -140,9 +140,54 @@ def deletar_branches_locais():
 
     return "\n".join(mensagens)
 
+def deletar_branch_remota_com_mensagem(branch):
+    if branch in {"main", "master", "develop"}:
+        return False, f"Branch protegida: {branch}"
+    elif branch_remota_existe(branch):
+        out, err = run_command(f"git push origin --delete {branch}")
+        if err:
+            return False, err
+        else:
+            return True, f"Branch remota '{branch}' deletada com sucesso."
+    else:
+        return False, f"Branch '{branch}' não existe remotamente."
+
+
+def atualizar_branch():
+    branches = listar_branches()
+    if not branches:
+        messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+        return
+
+    popup = Toplevel()
+    popup.title("Atualizar Branch")
+    popup.geometry("400x150")
+    popup.grab_set()
+
+    tk.Label(popup, text="Selecione uma branch para atualizar:").pack(pady=10)
+
+    branch_var = tk.StringVar()
+    combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+    combo.pack(pady=5)
+    combo.set(branches[0])
+
+    def confirmar():
+        branch = branch_var.get()
+        popup.destroy()
+        if branch:
+            run_command(f"git checkout {branch}")
+            stdout, stderr = run_command(f"git pull origin {branch}")
+            if stderr:
+                messagebox.showerror("Erro", stderr)
+            else:
+                messagebox.showinfo("Atualizado", f"Branch '{branch}' atualizada com sucesso.")
+
+    tk.Button(popup, text="Atualizar", command=confirmar, width=10).pack(pady=10)
+
+
+
 def deletar_branch_remota(branch):
-    protegidas = {"main", "master", "develop"}
-    if branch in protegidas:
+    if branch in {"main", "master", "develop"}:
         return False, f"Branch protegida: {branch}"
 
     if branch_remota_existe(branch):
@@ -152,21 +197,6 @@ def deletar_branch_remota(branch):
         return True, f"Branch remota '{branch}' deletada com sucesso."
 
     return False, f"Branch '{branch}' não existe remotamente."
-
-def confirmar():
-    branch = branch_v
-
-    if branch in {"main", "master", "develop"}:
-       messagebox.showwarning("Aviso", f"Branch protegida: {branch}")
-    elif branch_remota_existe(branch):
-       out, err = run_command(f"git push origin --delete {branch}")
-       if err:
-           messagebox.showerror("Erro", err)
-       else:
-           messagebox.showinfo("Deletada", f"Branch remota '{branch}' deletada com sucesso.")
-    else:
-       messagebox.showinfo("Aviso", f"Branch '{branch}' não existe remotamente.")
-
 
 
 load_dotenv()

@@ -3,7 +3,8 @@
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
-    get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request
+    get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request, \
+    deletar_branch_remota_com_mensagem
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -179,7 +180,7 @@ def iniciar_interface():
         branches = listar_branches()
         if not branches:
             messagebox.showerror("Erro", "Nenhuma branch encontrada.")
-            return
+        return
 
         popup = Toplevel()
         popup.title("Deletar Branch")
@@ -196,15 +197,14 @@ def iniciar_interface():
         def confirmar():
             branch = branch_var.get()
             if branch:
-                if branch == get_current_branch():
-                    messagebox.showwarning("Aviso", "Você não pode deletar a branch atual.")
+                sucesso, mensagem = deletar_branch_remota_com_mensagem(branch)
+                if sucesso:
+                    messagebox.showinfo("Deletada", mensagem)
                 else:
-                    stdout, stderr = run_command(f"git branch -D {branch}")
-                    atualizar_logs()
-                    if stderr:
-                        messagebox.showerror("Erro ao deletar", stderr)
+                    if "protegida" in mensagem or "não existe" in mensagem:
+                        messagebox.showinfo("Aviso", mensagem)
                     else:
-                        messagebox.showinfo("Branch Deletada", f"Branch '{branch}' foi deletada com sucesso.")
+                        messagebox.showerror("Erro", mensagem)
             popup.destroy()
 
         tk.Button(popup, text="Deletar", command=confirmar, width=10).pack(pady=10)
