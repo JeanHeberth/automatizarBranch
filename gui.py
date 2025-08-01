@@ -99,6 +99,7 @@ def iniciar_interface():
         arquivos_conflito = stdout.splitlines()
         atualizar_logs()
 
+
         if not arquivos_conflito:
             messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
             return
