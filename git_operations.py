@@ -247,7 +247,6 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
         detalhes_msg = f"\nDetalhes: {detalhes}" if detalhes else ""
         return False, f"❌ Erro ao criar PR: {erro}.{detalhes_msg}"
 
-
 def merge_pull_request(numero_pr):
     if not GITHUB_TOKEN:
         return False, "Token do GitHub não encontrado."
@@ -263,6 +262,8 @@ def merge_pull_request(numero_pr):
 
     if response.status_code == 200:
         return True, f"✅ Pull Request #{numero_pr} mergeado com sucesso."
+    elif response.status_code == 405:
+        return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: Pull Request is not mergeable"
     else:
         erro = response.json().get("message", "Erro desconhecido")
         return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: {erro}"

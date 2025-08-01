@@ -281,6 +281,7 @@ def iniciar_interface():
 
         tk.Button(popup, text="Criar Pull Request", command=confirmar, width=20).pack(pady=15)
 
+
     def acao_merge_pull_request():
         numero = simpledialog.askstring("Número do PR", "Digite o número do Pull Request para fazer merge:")
         if not numero:
@@ -290,11 +291,13 @@ def iniciar_interface():
         except ValueError:
             messagebox.showerror("Erro", "Número do PR inválido.")
             return
+
         sucesso, mensagem = merge_pull_request(numero)
         if sucesso:
             messagebox.showinfo("Sucesso", mensagem)
         else:
             messagebox.showerror("Erro", mensagem)
+
 
     def adicionar_botao_merge(janela):
         btn_merge_pr = tk.Button(janela, text="Merge Pull Request", command=acao_merge_pull_request)
