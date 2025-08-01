@@ -315,5 +315,4 @@ def iniciar_interface():
         # acao_merge_pull_request,
         log_output
     )
-    adicionar_botao_merge(janela)
     janela.mainloop()
