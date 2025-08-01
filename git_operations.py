@@ -1,7 +1,10 @@
-
+import os
 import tkinter as tk
 from tkinter import Toplevel
 from tkinter import ttk, messagebox
+import requests
+from dotenv import load_dotenv
+
 
 from utils import run_command
 
@@ -120,12 +123,9 @@ def fazer_checkout(branch):
 
 
 
-def deletar_branches_locais_com_verificacao():
+def deletar_branches_locais():
     stdout, _ = run_command("git branch")
     all_branches = [b.strip("* ").strip() for b in stdout.splitlines()]
-
-    stdout, _ = run_command("git branch --merged")
-    merged_branches = [b.strip("* ").strip() for b in stdout.splitlines()]
 
     protegidas = {"main", "master", "develop"}
     mensagens = []
@@ -133,11 +133,10 @@ def deletar_branches_locais_com_verificacao():
     for branch in all_branches:
         if branch in protegidas:
             continue
-        if branch in merged_branches:
-            out, err = run_command(f"git branch -d {branch}")
-            mensagens.append(f"✅ {branch} deletada." if not err else f"⚠️ Erro ao deletar {branch}: {err}")
-        else:
-            mensagens.append(f"⛔ {branch} não foi mergeada. Não deletada.")
+        out, err = run_command(f"git branch -D {branch}")
+        mensagens.append(
+            f"✅ {branch} deletada." if not err else f"⚠️ Erro ao deletar {branch}: {err}"
+        )
 
     return "\n".join(mensagens)
 
@@ -173,3 +172,36 @@ def confirmar():
         else:
             messagebox.showinfo("Aviso", f"Branch '{branch}' não existe remotamente.")
 
+
+
+load_dotenv()
+GITHUB_API_URL = "https://api.github.com"
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+REPO_OWNER = "JeanHeberth"  # Substitua pelo seu usuário
+REPO_NAME = "automatizarBranch"  # Substitua pelo nome do seu repositório
+
+def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", corpo="PR criado automaticamente"):
+    if not GITHUB_TOKEN:
+        return False, "Token do GitHub não encontrado."
+
+    url = f"{GITHUB_API_URL}/repos/{REPO_OWNER}/{REPO_NAME}/pulls"
+
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    payload = {
+        "title": titulo,
+        "body": corpo,
+        "head": branch_origem,
+        "base": branch_destino
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+
+    if response.status_code == 201:
+        return True, f"✅ Pull Request criado: {response.json().get('html_url')}"
+    else:
+        erro = response.json().get("message", "Erro desconhecido")
+        return False, f"❌ Erro ao criar PR: {erro}"
