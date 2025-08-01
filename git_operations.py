@@ -219,7 +219,6 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json"
     }
-
     payload = {
         "title": titulo,
         "body": corpo,
@@ -232,6 +231,11 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
     if response.status_code == 201:
         pr_url = response.json().get('html_url')
         pr_number = response.json().get('number')
+
+        # Loga o número do PR
+        with open("log.txt", "a") as log:
+            log.write(f"[PR CRIADO] Número: #{pr_number} | URL: {pr_url}\n")
+
         merge_ok, merge_msg = merge_pull_request(pr_number)
         if merge_ok:
             return True, f"✅ Pull Request criado e mergeado automaticamente: {pr_url}"
@@ -263,24 +267,3 @@ def merge_pull_request(numero_pr):
         erro = response.json().get("message", "Erro desconhecido")
         return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: {erro}"
 
-
-def acao_merge_pull_request():
-    numero = simpledialog.askstring("Número do PR", "Digite o número do Pull Request para fazer merge:")
-    if not numero:
-        return
-    try:
-        numero = int(numero)
-    except ValueError:
-        messagebox.showerror("Erro", "Número do PR inválido.")
-        return
-
-    sucesso, mensagem = merge_pull_request(numero)
-    if sucesso:
-        messagebox.showinfo("Sucesso", mensagem)
-    else:
-        messagebox.showerror("Erro", mensagem)
-
-
-def adicionar_botao_merge(janela):
-    btn_merge_pr = tk.Button(janela, text="Merge Pull Request", command=acao_merge_pull_request)
-    btn_merge_pr.pack(pady=5)

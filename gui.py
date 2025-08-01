@@ -5,7 +5,7 @@ from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
     get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request, \
-    deletar_branch_remota_com_mensagem, merge_pull_request, adicionar_botao_merge
+    deletar_branch_remota_com_mensagem, merge_pull_request
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -295,6 +295,11 @@ def iniciar_interface():
             messagebox.showinfo("Sucesso", mensagem)
         else:
             messagebox.showerror("Erro", mensagem)
+
+    def adicionar_botao_merge(janela):
+        btn_merge_pr = tk.Button(janela, text="Merge Pull Request", command=acao_merge_pull_request)
+        btn_merge_pr.pack(pady=5)
+
 
     construir_interface(
         janela, repo_var,
