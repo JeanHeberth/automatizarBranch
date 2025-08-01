@@ -2,8 +2,8 @@ import os
 import tkinter as tk
 from tkinter import Toplevel
 from tkinter import ttk, messagebox
-import requests
 from dotenv import load_dotenv
+import requests
 
 
 from utils import run_command
@@ -141,7 +141,6 @@ def deletar_branches_locais():
     return "\n".join(mensagens)
 
 def deletar_branch_remota(branch):
-
     protegidas = {"main", "master", "develop"}
     if branch in protegidas:
         return False, f"Branch protegida: {branch}"
@@ -154,23 +153,19 @@ def deletar_branch_remota(branch):
 
     return False, f"Branch '{branch}' não existe remotamente."
 
-
-
-
-
 def confirmar():
-        branch = branch_var.get()
+    branch = branch_v
 
-        if branch in {"main", "master", "develop"}:
-            messagebox.showwarning("Aviso", f"Branch protegida: {branch}")
-        elif branch_remota_existe(branch):
-            out, err = run_command(f"git push origin --delete {branch}")
-            if err:
-                messagebox.showerror("Erro", err)
-            else:
-                messagebox.showinfo("Deletada", f"Branch remota '{branch}' deletada com sucesso.")
-        else:
-            messagebox.showinfo("Aviso", f"Branch '{branch}' não existe remotamente.")
+    if branch in {"main", "master", "develop"}:
+       messagebox.showwarning("Aviso", f"Branch protegida: {branch}")
+    elif branch_remota_existe(branch):
+       out, err = run_command(f"git push origin --delete {branch}")
+       if err:
+           messagebox.showerror("Erro", err)
+       else:
+           messagebox.showinfo("Deletada", f"Branch remota '{branch}' deletada com sucesso.")
+    else:
+       messagebox.showinfo("Aviso", f"Branch '{branch}' não existe remotamente.")
 
 
 

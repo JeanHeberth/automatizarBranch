@@ -1,8 +1,7 @@
-# Interface gráfica
-tk  # tkinter
-
-# Requisições HTTP
-requests
-
-# Leitura de variáveis de ambiente (.env)
-python-dotenv
+certifi==2025.7.14
+charset-normalizer==3.4.2
+idna==3.10
+python-dotenv==1.1.1
+requests==2.32.4
+tk==0.1.0
+urllib3==2.5.0
