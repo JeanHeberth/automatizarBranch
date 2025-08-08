@@ -1,7 +1,7 @@
 def construir_interface(janela, repo_var, selecionar_repositorio, acao_atualizar_branch_principal,
                         acao_criar_branch, acao_commit, acao_commit_push, acao_resolver_conflitos,
-                        acao_checkout_branch,  acao_criar_pr,acao_merge_pull_request,acao_deletar_branch,
-                        acao_deletar_branch_local, acao_deletar_branch_remota,  log_output):
+                        acao_checkout_branch, acao_deletar_branch, acao_criar_pr,
+                        acao_deletar_branch_local, acao_deletar_branch_remota, acao_merge_pull_request, log_output):
     import tkinter as tk
     tk.Label(janela, text="Repositório Git:").pack(pady=5)
     tk.Entry(janela, textvariable=repo_var, width=60, state="readonly").pack(padx=10)
