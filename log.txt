@@ -3,3 +3,4 @@
 [PR MERGED] Número: #52 | Commit: 8cdfd264a8222685989df931e65fca6ba9ff618b
 [PR CRIADO] Número: #53 | URL: https://github.com/JeanHeberth/automatizarBranch/pull/53
 [PR MERGED] Número: #53 | Commit: 2c378d4cd791ad60c6ec2b566821eeeff742056a
+[PR CRIADO] Número: #54 | URL: https://github.com/JeanHeberth/automatizarBranch/pull/54
