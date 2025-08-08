@@ -5,7 +5,7 @@ from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
     get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request, \
-    deletar_branch_remota_com_mensagem, merge_pull_request
+    deletar_branch_remota_com_mensagem, merge_pull_request, deletar_branch_local_com_mensagem
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -215,6 +215,41 @@ def iniciar_interface():
         atualizar_logs()
         messagebox.showinfo("Branches Locais", resultado)
 
+    def acao_deletar_branch_local():
+        resultado = deletar_branches_locais()
+        atualizar_logs()
+        messagebox.showinfo("Branches Locais", resultado)
+
+    def acao_deletar_branch():
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Deletar Branch Local")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch local para deletar:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch = branch_var.get()
+            if branch:
+                sucesso = deletar_branch_local_com_mensagem(branch)
+                atualizar_logs()
+                if sucesso:
+                    # A função já mostra as mensagens de sucesso/erro
+                    pass
+            popup.destroy()
+
+        tk.Button(popup, text="Deletar", command=confirmar, width=12).pack(pady=15)
+
     def acao_deletar_branch_remota(branch):
         if branch:
             sucesso, mensagem = deletar_branch_remota(branch)
@@ -310,7 +345,7 @@ def iniciar_interface():
         acao_checkout_branch,
         acao_deletar_branch,
         acao_criar_pr,
-        acao_deletar_branches_locais,
+        acao_deletar_branch_local,
         acao_deletar_branch_remota,
         acao_merge_pull_request,
         log_output
