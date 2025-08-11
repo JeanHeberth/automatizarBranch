@@ -149,6 +149,52 @@ def deletar_branch_remota_com_mensagem(branch):
         return False, f"Branch '{branch}' não existe remotamente."
 
 
+def deletar_branch_local_com_mensagem(branch):
+    """
+    Deleta uma branch local com mensagem personalizada
+    """
+    from tkinter import messagebox, simpledialog
+    
+    # Verificar se a branch existe localmente
+    branches = listar_branches()
+    if branch not in branches:
+        messagebox.showerror("Erro", f"Branch '{branch}' não existe localmente.")
+        return False
+    
+    # Verificar se não é a branch atual
+    current_branch = get_current_branch()
+    if branch == current_branch:
+        messagebox.showerror("Erro", f"Não é possível deletar a branch atual '{branch}'. Faça checkout para outra branch primeiro.")
+        return False
+    
+    # Solicitar mensagem de confirmação
+    mensagem = simpledialog.askstring(
+        "Confirmar Deleção", 
+        f"Digite uma mensagem para confirmar a deleção da branch '{branch}':",
+        initialvalue=f"Deletando branch local {branch}"
+    )
+    
+    if not mensagem:
+        messagebox.showinfo("Cancelado", "Deleção cancelada pelo usuário.")
+        return False
+    
+    # Executar comando para deletar a branch local
+    success, output = run_command(f"git branch -d {branch}")
+    
+    if success:
+        messagebox.showinfo("Sucesso", f"Branch '{branch}' deletada localmente com sucesso.\nMensagem: {mensagem}")
+        return True
+    else:
+        # Tentar forçar a deleção se a deleção normal falhar
+        force_success, force_output = run_command(f"git branch -D {branch}")
+        if force_success:
+            messagebox.showwarning("Sucesso (Forçado)", f"Branch '{branch}' foi forçadamente deletada localmente.\nMensagem: {mensagem}\nAviso: A branch pode ter commits não mesclados.")
+            return True
+        else:
+            messagebox.showerror("Erro", f"Erro ao deletar branch '{branch}' localmente:\n{force_output}")
+            return False
+
+
 def atualizar_branch():
     branches = listar_branches()
     if not branches:
@@ -211,13 +257,33 @@ REPO_NAME = "automatizarBranch"  # Substitua pelo nome do seu repositório
 
 def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", corpo="PR criado automaticamente"):
     if not GITHUB_TOKEN:
-        return False, "Token do GitHub não encontrado."
+        return False, "❌ Token do GitHub não encontrado. Verifique o arquivo .env"
+    
+    # Obter configuração dinamicamente do repositório atual
+    from utils import get_repo_config
+    config = get_repo_config()
+    if not config:
+        return False, "❌ Configuração do repositório não encontrada"
+    
+    REPO_OWNER = config.get('usuario')
+    REPO_NAME = config.get('repositorio')
+    
+    if not REPO_OWNER or not REPO_NAME:
+        return False, "❌ Usuário ou repositório não configurados no .git-config.json"
+
+    # Validações básicas
+    if not branch_origem or not branch_destino:
+        return False, "❌ Branches de origem e destino são obrigatórias"
+    
+    if branch_origem == branch_destino:
+        return False, "❌ Branch de origem e destino não podem ser iguais"
 
     url = f"{GITHUB_API_URL}/repos/{REPO_OWNER}/{REPO_NAME}/pulls"
 
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json"
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
     payload = {
         "title": titulo,
@@ -226,45 +292,126 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
         "base": branch_destino
     }
 
-    response = requests.post(url, headers=headers, json=payload)
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 201:
+            pr_data = response.json()
+            pr_url = pr_data.get('html_url')
+            pr_number = pr_data.get('number')
 
-    if response.status_code == 201:
-        pr_url = response.json().get('html_url')
-        pr_number = response.json().get('number')
+            # Loga o número do PR
+            with open("log.txt", "a") as log:
+                log.write(f"[PR CRIADO] Número: #{pr_number} | URL: {pr_url}\n")
 
-        # Loga o número do PR
-        with open("log.txt", "a") as log:
-            log.write(f"[PR CRIADO] Número: #{pr_number} | URL: {pr_url}\n")
-
-        merge_ok, merge_msg = merge_pull_request(pr_number)
-        if merge_ok:
-            return True, f"✅ Pull Request criado e mergeado automaticamente: {pr_url}"
+            return True, f"✅ Pull Request #{pr_number} criado com sucesso!\n🔗 URL: {pr_url}"
+        
+        elif response.status_code == 422:
+            # Erro comum quando já existe um PR ou há conflitos
+            try:
+                error_data = response.json()
+                erro = error_data.get("message", "Erro de validação")
+                if "pull request already exists" in erro.lower():
+                    return False, f"❌ Já existe um Pull Request aberto entre {branch_origem} e {branch_destino}"
+                else:
+                    return False, f"❌ Erro de validação: {erro}"
+            except:
+                return False, "❌ Erro de validação (422) - Verifique se as branches existem"
+        
+        elif response.status_code == 401:
+            return False, "❌ Token do GitHub inválido ou expirado"
+        
+        elif response.status_code == 404:
+            return False, f"❌ Repositório {REPO_OWNER}/{REPO_NAME} não encontrado ou sem acesso"
+        
         else:
-            return False, f"✅ Pull Request criado: {pr_url}, mas falha ao fazer merge: {merge_msg}"
-    else:
-        erro = response.json().get("message", "Erro desconhecido")
-        detalhes = response.json().get("errors", [])
-        detalhes_msg = f"\nDetalhes: {detalhes}" if detalhes else ""
-        return False, f"❌ Erro ao criar PR: {erro}.{detalhes_msg}"
+            try:
+                error_data = response.json()
+                erro = error_data.get("message", "Erro desconhecido")
+                return False, f"❌ Erro ao criar PR ({response.status_code}): {erro}"
+            except:
+                return False, f"❌ Erro HTTP {response.status_code} ao criar Pull Request"
+                
+    except requests.exceptions.Timeout:
+        return False, "❌ Timeout na requisição - Verifique sua conexão com a internet"
+    except requests.exceptions.ConnectionError:
+        return False, "❌ Erro de conexão - Verifique sua conexão com a internet"
+    except Exception as e:
+        return False, f"❌ Erro inesperado: {str(e)}"
 
 def merge_pull_request(numero_pr):
     if not GITHUB_TOKEN:
-        return False, "Token do GitHub não encontrado."
+        return False, "❌ Token do GitHub não encontrado. Verifique o arquivo .env"
+    
+    # Obter configuração dinamicamente
+    from utils import get_repo_config
+    config = get_repo_config()
+    if not config:
+        return False, "❌ Configuração do repositório não encontrada"
+    
+    REPO_OWNER = config.get('usuario')
+    REPO_NAME = config.get('repositorio')
+    
+    # Validação básica
+    if not numero_pr:
+        return False, "❌ Número do Pull Request é obrigatório"
+    
+    try:
+        numero_pr = int(numero_pr)
+    except (ValueError, TypeError):
+        return False, "❌ Número do Pull Request deve ser um número válido"
 
     url = f"{GITHUB_API_URL}/repos/{REPO_OWNER}/{REPO_NAME}/pulls/{numero_pr}/merge"
 
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json"
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    
+    # Payload para o merge
+    payload = {
+        "commit_title": f"Merge pull request #{numero_pr}",
+        "merge_method": "merge"  # Pode ser 'merge', 'squash' ou 'rebase'
     }
 
-    response = requests.put(url, headers=headers)
+    try:
+        response = requests.put(url, headers=headers, json=payload, timeout=30)
 
-    if response.status_code == 200:
-        return True, f"✅ Pull Request #{numero_pr} mergeado com sucesso."
-    elif response.status_code == 405:
-        return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: Pull Request is not mergeable"
-    else:
-        erro = response.json().get("message", "Erro desconhecido")
-        return False, f"❌ Erro ao fazer merge do PR #{numero_pr}: {erro}"
+        if response.status_code == 200:
+            merge_data = response.json()
+            commit_sha = merge_data.get('sha', 'N/A')
+            
+            # Loga o merge
+            with open("log.txt", "a") as log:
+                log.write(f"[PR MERGED] Número: #{numero_pr} | Commit: {commit_sha}\n")
+            
+            return True, f"✅ Pull Request #{numero_pr} mergeado com sucesso!\n📝 Commit: {commit_sha[:8]}"
+        
+        elif response.status_code == 405:
+            return False, f"❌ Pull Request #{numero_pr} não pode ser mergeado\n(pode estar fechado, já mergeado ou ter conflitos)"
+        
+        elif response.status_code == 404:
+            return False, f"❌ Pull Request #{numero_pr} não encontrado no repositório {REPO_OWNER}/{REPO_NAME}"
+        
+        elif response.status_code == 401:
+            return False, "❌ Token do GitHub inválido ou sem permissão para fazer merge"
+        
+        elif response.status_code == 409:
+            return False, f"❌ Pull Request #{numero_pr} tem conflitos que precisam ser resolvidos primeiro"
+        
+        else:
+            try:
+                error_data = response.json()
+                erro = error_data.get("message", "Erro desconhecido")
+                return False, f"❌ Erro ao fazer merge do PR #{numero_pr} ({response.status_code}): {erro}"
+            except:
+                return False, f"❌ Erro HTTP {response.status_code} ao fazer merge do Pull Request #{numero_pr}"
+                
+    except requests.exceptions.Timeout:
+        return False, "❌ Timeout na requisição - Verifique sua conexão com a internet"
+    except requests.exceptions.ConnectionError:
+        return False, "❌ Erro de conexão - Verifique sua conexão com a internet"
+    except Exception as e:
+        return False, f"❌ Erro inesperado ao fazer merge: {str(e)}"
 

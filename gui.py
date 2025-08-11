@@ -5,7 +5,7 @@ from tkinter import filedialog, simpledialog, messagebox, Toplevel, ttk
 
 from git_operations import criar_branch, fazer_commit, push, atualizar_branch, listar_branches, fazer_checkout, \
     get_current_branch, deletar_branches_locais, deletar_branch_remota, criar_pull_request, \
-    deletar_branch_remota_com_mensagem, merge_pull_request
+    deletar_branch_remota_com_mensagem, merge_pull_request, deletar_branch_local_com_mensagem
 from interface_widgets import construir_interface
 from utils import set_repo_path, get_repo_path, has_changes, get_logs, clear_logs, run_command, get_repo_config, log
 
@@ -95,16 +95,196 @@ def iniciar_interface():
     atualizar_logs()
 
     def acao_resolver_conflitos():
-        stdout, _ = run_command("git diff --name-only --diff-filter=U")
-        arquivos_conflito = stdout.splitlines()
+        # Detectar diferentes tipos de conflitos
+        conflitos_merge, _ = run_command("git diff --name-only --diff-filter=U")
+        arquivos_conflito = conflitos_merge.splitlines()
+        
+        # Verificar se há merge em andamento
+        merge_head_exists = run_command("test -f .git/MERGE_HEAD")[1] == ""
+        
+        # Verificar se há rebase em andamento
+        rebase_apply_exists = run_command("test -d .git/rebase-apply")[1] == ""
+        rebase_merge_exists = run_command("test -d .git/rebase-merge")[1] == ""
+        
+        # Verificar status geral do repositório
+        status_output, _ = run_command("git status --porcelain")
+        
         atualizar_logs()
-
+        
+        # Determinar o tipo de conflito
+        tipo_conflito = "Desconhecido"
+        if merge_head_exists:
+            tipo_conflito = "Merge"
+        elif rebase_apply_exists or rebase_merge_exists:
+            tipo_conflito = "Rebase"
+        elif arquivos_conflito:
+            tipo_conflito = "Conflitos de arquivo"
+        
+        if not arquivos_conflito and not merge_head_exists and not rebase_apply_exists and not rebase_merge_exists:
+            # Verificar se há conflitos não detectados
+            cherry_pick_head = run_command("test -f .git/CHERRY_PICK_HEAD")[1] == ""
+            if cherry_pick_head:
+                tipo_conflito = "Cherry-pick"
+            else:
+                messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado no repositório.")
+                return
+        
+        popup = Toplevel()
+        popup.title(f"Resolver Conflitos - {tipo_conflito}")
+        popup.geometry("650x500")
+        popup.grab_set()
+        
+        # Cabeçalho com informações do conflito
+        header_frame = tk.Frame(popup)
+        header_frame.pack(pady=10, padx=10, fill=tk.X)
+        
+        tk.Label(header_frame, text=f"Tipo de conflito: {tipo_conflito}", 
+                font=("Arial", 12, "bold")).pack()
+        
+        if arquivos_conflito:
+            tk.Label(header_frame, text=f"Arquivos com conflito: {len(arquivos_conflito)}", 
+                    font=("Arial", 10)).pack()
+        
+        # Frame para lista de arquivos
+        if arquivos_conflito:
+            tk.Label(popup, text="Arquivos com conflito:").pack(pady=(10, 5))
+            
+            lista = tk.Listbox(popup, selectmode=tk.MULTIPLE, width=80, height=10)
+            for arquivo in arquivos_conflito:
+                lista.insert(tk.END, arquivo)
+            lista.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+        
+        # Frame para botões de ação
+        button_frame = tk.Frame(popup)
+        button_frame.pack(pady=10, padx=10, fill=tk.X)
+        
+        def abrir_selecionados():
+            if not arquivos_conflito:
+                messagebox.showinfo("Aviso", "Nenhum arquivo com conflito para abrir.")
+                return
+                
+            selecionados = [lista.get(i) for i in lista.curselection()]
+            if not selecionados:
+                # Se nenhum selecionado, abrir todos
+                selecionados = arquivos_conflito
+                
+            for arquivo in selecionados:
+                run_command(f"code {arquivo}")
+            log(f"Abrindo arquivos com conflito: {', '.join(selecionados)}")
+            messagebox.showinfo("Info", f"Abertos {len(selecionados)} arquivo(s) no VS Code.")
+        
+        def executar_git_status():
+            output, _ = run_command("git status")
+            atualizar_logs()
+            
+            # Criar popup para mostrar status completo
+            status_popup = Toplevel(popup)
+            status_popup.title("Git Status")
+            status_popup.geometry("600x400")
+            status_popup.grab_set()
+            
+            text_widget = tk.Text(status_popup, wrap=tk.WORD)
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            text_widget.insert(tk.END, output)
+            text_widget.config(state=tk.DISABLED)
+            
+            tk.Button(status_popup, text="Fechar", command=status_popup.destroy).pack(pady=5)
+        
+        def abortar_operacao():
+            confirm = messagebox.askyesno("Abortar", 
+                                        f"Deseja abortar a operação de {tipo_conflito.lower()} em andamento?\n\n"
+                                        "Isso desfará todas as alterações não commitadas.")
+            if confirm:
+                if merge_head_exists:
+                    run_command("git merge --abort")
+                elif rebase_apply_exists or rebase_merge_exists:
+                    run_command("git rebase --abort")
+                elif run_command("test -f .git/CHERRY_PICK_HEAD")[1] == "":
+                    run_command("git cherry-pick --abort")
+                
+                atualizar_logs()
+                messagebox.showinfo("Abortado", f"Operação de {tipo_conflito.lower()} abortada com sucesso.")
+                popup.destroy()
+        
+        def continuar_operacao():
+            if not arquivos_conflito:
+                messagebox.showinfo("Aviso", "Não há conflitos para resolver.")
+                return
+                
+            # Verificar se ainda há conflitos
+            conflitos_restantes, _ = run_command("git diff --name-only --diff-filter=U")
+            if conflitos_restantes.strip():
+                messagebox.showwarning("Conflitos pendentes", 
+                                     "Ainda há conflitos não resolvidos. Resolva todos os conflitos antes de continuar.")
+                return
+            
+            confirm = messagebox.askyesno("Continuar", 
+                                        f"Todos os conflitos foram resolvidos?\n\n"
+                                        "Isso executará:\n  git add .\n  git commit (ou continuará a operação)")
+            if confirm:
+                run_command("git add .")
+                
+                if merge_head_exists:
+                    run_command("git commit --no-edit")
+                    messagebox.showinfo("Sucesso", "Merge finalizado com sucesso.")
+                elif rebase_apply_exists or rebase_merge_exists:
+                    run_command("git rebase --continue")
+                    messagebox.showinfo("Sucesso", "Rebase continuado. Verifique se há mais conflitos.")
+                elif run_command("test -f .git/CHERRY_PICK_HEAD")[1] == "":
+                    run_command("git cherry-pick --continue")
+                    messagebox.showinfo("Sucesso", "Cherry-pick continuado.")
+                else:
+                    run_command("git commit -m 'Resolvendo conflitos'")
+                    messagebox.showinfo("Sucesso", "Conflitos resolvidos e commit realizado.")
+                
+                atualizar_logs()
+                popup.destroy()
+        
+        def finalizar_conflitos_manual():
+            mensagem = simpledialog.askstring("Mensagem do Commit", 
+                                             "Digite a mensagem do commit:", 
+                                             initialvalue="Resolvendo conflitos")
+            if not mensagem:
+                return
+            
+            confirm = messagebox.askyesno("Finalizar", 
+                                        f"Deseja executar:\n\n  git add .\n  git commit -m '{mensagem}'?")
+            if confirm:
+                run_command("git add .")
+                run_command(f"git commit -m '{mensagem}'")
+                atualizar_logs()
+                messagebox.showinfo("Sucesso", "Conflitos resolvidos e commit realizado.")
+                popup.destroy()
+        
+        # Botões organizados em linhas
+        if arquivos_conflito:
+            tk.Button(button_frame, text="Abrir Arquivos no VS Code", 
+                     command=abrir_selecionados, width=25).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame, text="Ver Git Status", 
+                 command=executar_git_status, width=20).pack(side=tk.LEFT, padx=5)
+        
+        # Segunda linha de botões
+        button_frame2 = tk.Frame(popup)
+        button_frame2.pack(pady=5, padx=10, fill=tk.X)
+        
+        tk.Button(button_frame2, text="Continuar Operação", 
+                 command=continuar_operacao, width=20, bg="#4CAF50", fg="white").pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame2, text="Commit Manual", 
+                 command=finalizar_conflitos_manual, width=20, bg="#2196F3", fg="white").pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame2, text="Abortar Operação", 
+                 command=abortar_operacao, width=20, bg="#f44336", fg="white").pack(side=tk.LEFT, padx=5)
+        
+        # Botão fechar
+        tk.Button(popup, text="Fechar", command=popup.destroy, width=15).pack(pady=10)
 
         if not arquivos_conflito:
             messagebox.showinfo("Sem conflitos", "Nenhum conflito detectado.")
             return
 
-        popup = Toplevel()
+        popup = Toplevel() 
         popup.title("Conflitos detectados")
         popup.geometry("550x400")
         popup.grab_set()
@@ -215,6 +395,41 @@ def iniciar_interface():
         atualizar_logs()
         messagebox.showinfo("Branches Locais", resultado)
 
+    def acao_deletar_branch_local():
+        resultado = deletar_branches_locais()
+        atualizar_logs()
+        messagebox.showinfo("Branches Locais", resultado)
+
+    def acao_deletar_branch():
+        branches = listar_branches()
+        if not branches:
+            messagebox.showerror("Erro", "Nenhuma branch encontrada.")
+            return
+
+        popup = Toplevel()
+        popup.title("Deletar Branch Local")
+        popup.geometry("400x150")
+        popup.grab_set()
+
+        tk.Label(popup, text="Selecione uma branch local para deletar:").pack(pady=10)
+
+        branch_var = tk.StringVar()
+        combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        combo.pack(pady=5)
+        combo.set(branches[0])
+
+        def confirmar():
+            branch = branch_var.get()
+            if branch:
+                sucesso = deletar_branch_local_com_mensagem(branch)
+                atualizar_logs()
+                if sucesso:
+                    # A função já mostra as mensagens de sucesso/erro
+                    pass
+            popup.destroy()
+
+        tk.Button(popup, text="Deletar", command=confirmar, width=12).pack(pady=15)
+
     def acao_deletar_branch_remota(branch):
         if branch:
             sucesso, mensagem = deletar_branch_remota(branch)
@@ -308,11 +523,11 @@ def iniciar_interface():
         acao_commit_push,
         acao_resolver_conflitos,
         acao_checkout_branch,
-        # acao_deletar_branch,
+        acao_deletar_branch,
         acao_criar_pr,
-        acao_deletar_branches_locais,
+        acao_deletar_branch_local,
         acao_deletar_branch_remota,
-        # acao_merge_pull_request,
+        acao_merge_pull_request,
         log_output
     )
     janela.mainloop()
