@@ -258,6 +258,18 @@ REPO_NAME = "automatizarBranch"  # Substitua pelo nome do seu repositório
 def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", corpo="PR criado automaticamente"):
     if not GITHUB_TOKEN:
         return False, "❌ Token do GitHub não encontrado. Verifique o arquivo .env"
+    
+    # Obter configuração dinamicamente do repositório atual
+    from utils import get_repo_config
+    config = get_repo_config()
+    if not config:
+        return False, "❌ Configuração do repositório não encontrada"
+    
+    REPO_OWNER = config.get('usuario')
+    REPO_NAME = config.get('repositorio')
+    
+    if not REPO_OWNER or not REPO_NAME:
+        return False, "❌ Usuário ou repositório não configurados no .git-config.json
 
     # Validações básicas
     if not branch_origem or not branch_destino:
@@ -329,8 +341,17 @@ def criar_pull_request(branch_origem, branch_destino="main", titulo="Novo PR", c
 
 def merge_pull_request(numero_pr):
     if not GITHUB_TOKEN:
-        return False, "❌ Token do GitHub não encontrado. Verifique o arquivo .env"
-
+        return False, "❌ Token do GitHub não encontrado. Verifique o arquivo .env
+    
+    # Obter configuração dinamicamente
+    from utils import get_repo_config
+    config = get_repo_config()
+    if not config:
+        return False, "❌ Configuração do repositório não encontrada"
+    
+    REPO_OWNER = config.get('usuario')
+    REPO_NAME = config.get('repositorio')
+   
     # Validação básica
     if not numero_pr:
         return False, "❌ Número do Pull Request é obrigatório"
