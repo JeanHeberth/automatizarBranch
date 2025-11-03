@@ -7,11 +7,9 @@ from core.git_operations import get_current_branch
 
 GITHUB_API = "https://api.github.com"
 
+
 def create_pull_request(repo_path, base="main", title=None, body=""):
-    """
-    Cria um Pull Request via GitHub API.
-    Retorna a URL do PR criado e a abre no navegador.
-    """
+    """Cria um Pull Request via GitHub API."""
     token = require_github_token()
     repo = get_repo_info(repo_path)
     head = get_current_branch(repo_path)
@@ -20,7 +18,6 @@ def create_pull_request(repo_path, base="main", title=None, body=""):
         raise RuntimeError("Você está na branch principal. Crie uma nova branch antes do PR.")
 
     title = title or f"Merge {head} → {base}"
-
     url = f"{GITHUB_API}/repos/{repo.owner}/{repo.name}/pulls"
     payload = {"title": title, "head": head, "base": base, "body": body}
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
@@ -35,9 +32,7 @@ def create_pull_request(repo_path, base="main", title=None, body=""):
 
 
 def merge_pull_request(repo_path, pr_number):
-    """
-    Faz merge de um PR via API do GitHub.
-    """
+    """Faz merge de um PR via API do GitHub."""
     token = require_github_token()
     repo = get_repo_info(repo_path)
     url = f"{GITHUB_API}/repos/{repo.owner}/{repo.name}/pulls/{pr_number}/merge"
@@ -47,3 +42,18 @@ def merge_pull_request(repo_path, pr_number):
     if response.status_code != 200:
         raise RuntimeError(f"Erro ao fazer merge do PR: {response.status_code} {response.text}")
     return response.json()
+
+
+def list_open_pull_requests(repo_path):
+    """Retorna todos os PRs abertos no repositório."""
+    token = require_github_token()
+    repo = get_repo_info(repo_path)
+    url = f"{GITHUB_API}/repos/{repo.owner}/{repo.name}/pulls?state=open"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        raise RuntimeError(f"Erro ao listar PRs: {response.status_code} {response.text}")
+
+    prs = response.json()
+    return [f"#{pr['number']} — {pr['title']}" for pr in prs]

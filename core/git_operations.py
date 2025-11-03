@@ -1,102 +1,132 @@
 # core/git_operations.py
-from __future__ import annotations
+import os
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
-from utils.repo_utils import get_repo_info, RepoInfo
-from core.env_utils import get_github_token
+from dotenv import load_dotenv
 
+
+# =====================================================
+# Exceção personalizada para erros Git
+# =====================================================
 class GitCommandError(Exception):
-    """Erro genérico ao executar comandos Git."""
     pass
 
-# ------------------------------------------------------------
-# 🔹 Funções auxiliares
-# ------------------------------------------------------------
 
-def run_git_command(repo_path: Path, args: list[str]) -> str:
+# =====================================================
+# Funções utilitárias principais
+# =====================================================
+def run_git_command(repo_path, args):
     """
-    Executa um comando git e retorna o stdout (limpo).
-    Lança exceção se o comando falhar.
+    Executa um comando Git e retorna a saída.
+    Lança GitCommandError em caso de erro.
     """
     try:
         result = subprocess.run(
             ["git"] + args,
             cwd=repo_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
-            check=True
+            check=False,
         )
+        log_output(repo_path, args, result)
+        if result.returncode != 0:
+            raise GitCommandError(result.stderr.strip() or result.stdout.strip())
         return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        raise GitCommandError(
-            f"Erro ao executar git {' '.join(args)}: {e.stderr.strip()}"
+    except Exception as e:
+        raise GitCommandError(f"Erro ao executar git {' '.join(args)}: {e}")
+
+
+def log_output(repo_path, args, result):
+    """Loga no console interno (debug opcional)"""
+    print(f"[{repo_path}] $ git {' '.join(args)}")
+    if result.stdout:
+        print("Saída:", result.stdout.strip())
+    if result.stderr:
+        print("Erro:", result.stderr.strip())
+
+
+# =====================================================
+# Configuração automática do token
+# =====================================================
+def configure_remote_with_token(repo_path):
+    """
+    Injeta o token do .env na URL remota se o repositório usa HTTPS.
+    Exemplo: transforma
+      https://github.com/usuario/repositorio.git
+    em:
+      https://<TOKEN>:x-oauth-basic@github.com/usuario/repositorio.git
+    """
+    load_dotenv()
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        print("⚠️  GITHUB_TOKEN não configurado no .env")
+        return
+
+    try:
+        # Verifica URL remota atual
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
         )
+        url = result.stdout.strip()
 
-# ------------------------------------------------------------
-# 🔹 Funções principais da automação
-# ------------------------------------------------------------
+        # Se já contém token, não faz nada
+        if "@" in url or url.startswith("git@"):
+            return
 
-def get_current_branch(repo_path: Path) -> str:
-    """
-    Retorna o nome da branch atual.
-    """
-    return run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+        if url.startswith("https://"):
+            new_url = url.replace("https://", f"https://{token}:x-oauth-basic@")
+            subprocess.run(["git", "remote", "set-url", "origin", new_url], cwd=repo_path)
+            print(f"✅ URL remota configurada com token para {repo_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️  Não foi possível verificar/configurar remoto: {e}")
 
-def create_branch(repo_path: Path, branch_name: str, base: str = "main") -> str:
-    """
-    Cria uma nova branch a partir da base (por padrão, main).
-    """
-    run_git_command(repo_path, ["checkout", base])
-    run_git_command(repo_path, ["pull", "origin", base])
+
+# =====================================================
+# Funções Git principais
+# =====================================================
+def get_current_branch(repo_path):
+    """Obtém o nome da branch atual."""
+    output = run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+    return output.strip()
+
+
+def create_branch(repo_path, branch_name):
+    """Cria uma nova branch a partir da atual."""
     run_git_command(repo_path, ["checkout", "-b", branch_name])
     return branch_name
 
-def commit_and_push(repo_path: Path, message: str) -> Tuple[str, str]:
+
+def commit_and_push(repo_path, message):
     """
-    Adiciona alterações, faz commit e push da branch atual.
-    Retorna (branch_name, remote_url)
+    Realiza git add, commit e push.
+    Configura automaticamente o token HTTPS.
     """
+    configure_remote_with_token(repo_path)
+
     run_git_command(repo_path, ["add", "."])
     run_git_command(repo_path, ["commit", "-m", message])
+
     branch = get_current_branch(repo_path)
     run_git_command(repo_path, ["push", "-u", "origin", branch])
+    remote = get_remote_name(repo_path)
+    return branch, remote
 
-    repo_info = get_repo_info(repo_path)
-    remote_url = f"https://{repo_info.host}/{repo_info.full_name}"
-    return branch, remote_url
 
-def merge_to_main(repo_path: Path) -> None:
+def get_remote_name(repo_path):
+    """Retorna o nome do remoto configurado (geralmente 'origin')."""
+    output = run_git_command(repo_path, ["remote"])
+    lines = output.splitlines()
+    return lines[0] if lines else "origin"
+
+
+def merge_to_main(repo_path, branch_name):
     """
-    Faz merge da branch atual na main (local).
+    Faz merge da branch informada na main (local).
     """
-    current = get_current_branch(repo_path)
-    if current == "main":
-        print("[INFO] Já está na branch main.")
-        return
     run_git_command(repo_path, ["checkout", "main"])
-    run_git_command(repo_path, ["pull", "origin", "main"])
-    run_git_command(repo_path, ["merge", current])
-    run_git_command(repo_path, ["push", "origin", "main"])
-    print(f"[OK] Merge concluído de {current} → main")
-
-def get_repo_info_summary(repo_path: Path) -> str:
-    """
-    Retorna uma string amigável com dados do repositório.
-    """
-    info = get_repo_info(repo_path)
-    return f"{info.full_name} ({info.host})"
-
-def get_authenticated_repo_url(repo_path: Path) -> str:
-    """
-    Retorna a URL do repositório, incluindo token se existir (para operações via API).
-    Exemplo:
-        https://<token>@github.com/user/repo.git
-    """
-    token = get_github_token()
-    info = get_repo_info(repo_path)
-
-    if token:
-        return f"https://{token}@{info.host}/{info.full_name}.git"
-    return f"https://{info.host}/{info.full_name}.git"
+    run_git_command(repo_path, ["merge", branch_name])
+    return "main"
