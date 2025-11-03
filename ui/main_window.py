@@ -1,228 +1,228 @@
 # ui/main_window.py
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from core.git_operations import (
-    get_repo_info_summary,
-    get_current_branch,
     create_branch,
     commit_and_push,
     merge_to_main,
+    get_current_branch,
+    run_git_command,
     GitCommandError,
 )
+from core.pr_operations import create_pull_request, merge_pull_request
 from utils.repo_utils import try_get_repo_info
+
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("🚀 Automação de Branches")
-        self.geometry("620x480")
+        self.title("Automacao Git com Tkinter")
+        self.configure(bg="#F0F0F0")
         self.resizable(False, False)
-        self.configure(bg="#111")
+        self.geometry("760x820")
 
         self.repo_path: Path | None = None
-
         self._build_ui()
 
     # --------------------------------------------------
     # UI
     # --------------------------------------------------
     def _build_ui(self):
-        # Cabeçalho
-        header = tk.Frame(self, bg="#111")
-        header.pack(pady=(20, 10))
+        container = ttk.Frame(self)
+        container.pack(fill="both", expand=True, padx=40, pady=25)
 
-        tk.Label(
-            header,
-            text="Automação de Branches 🧠",
-            font=("Segoe UI", 18, "bold"),
-            bg="#111",
-            fg="#00d4ff",
-        ).pack()
+        ttk.Label(container, text="Repositório Git:").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self.entry_repo = ttk.Entry(container, width=70)
+        self.entry_repo.state(["disabled"])
+        self.entry_repo.grid(row=1, column=0, sticky="ew")
 
-        tk.Label(
-            header,
-            text="Gerencie branches, commits e merges de forma rápida e visual.",
-            font=("Segoe UI", 10),
-            bg="#111",
-            fg="#bbb",
-        ).pack()
-
-        # Linha divisória
-        tk.Frame(self, bg="#222", height=2, width=580).pack(pady=10)
-
-        # Seção de repositório
-        repo_frame = tk.Frame(self, bg="#111")
-        repo_frame.pack(pady=10)
-
-        tk.Button(
-            repo_frame,
-            text="📁 Selecionar Repositório",
-            font=("Segoe UI", 11, "bold"),
-            bg="#00d4ff",
-            fg="black",
-            relief="flat",
-            bd=0,
-            padx=10,
-            pady=6,
-            activebackground="#00aee0",
-            command=self.select_repo,
-        ).pack()
-
-        self.lbl_repo_info = tk.Label(
-            self,
-            text="Nenhum repositório selecionado",
-            font=("Segoe UI", 10),
-            bg="#111",
-            fg="#fff",
+        ttk.Button(container, text="Selecionar Repositório", command=self.select_repo).grid(
+            row=2, column=0, pady=(12, 18)
         )
-        self.lbl_repo_info.pack(pady=(8, 0))
 
-        self.lbl_branch = tk.Label(
-            self,
-            text="",
-            font=("Segoe UI", 10),
-            bg="#111",
-            fg="#9efbff",
-        )
-        self.lbl_branch.pack()
+        buttons_frame = ttk.Frame(container)
+        buttons_frame.grid(row=3, column=0, sticky="ew")
 
-        # Campos
-        self._styled_entry("🌿 Nova branch (feature/...):", "branch")
-        self._styled_entry("💬 Mensagem de commit:", "commit")
+        BTN_WIDTH = 38
+        BTN_PADY = 8
 
-        # Botões de ação
-        btns = tk.Frame(self, bg="#111")
-        btns.pack(pady=25)
+        # Ordem idêntica ao exemplo
+        self._add_button(buttons_frame, "Atualizar Branch", self.on_atualizar_branch, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Checkout de Branch", self.on_checkout_branch, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Criar Branch", self.on_criar_branch, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Fazer Commit", self.on_fazer_commit, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Commit + Push", self.on_commit_push, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Criar Pull Request", self.on_criar_pr, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Merge Pull Request", self.on_merge_pr, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Resolver Conflitos", self.on_resolver_conflitos, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Deletar Branch", self.on_deletar_branch, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Deletar Branch Local", self.on_deletar_branch_local, BTN_WIDTH, BTN_PADY)
+        self._add_button(buttons_frame, "Deletar Branch Remota", self.on_deletar_branch_remota, BTN_WIDTH, BTN_PADY)
 
-        self._add_action_button(btns, "🪴 Criar Branch", self.handle_create_branch, 0)
-        self._add_action_button(btns, "💾 Commit & Push", self.handle_commit_push, 1)
-        self._add_action_button(btns, "🔀 Merge → main", self.handle_merge_main, 2)
+        ttk.Button(buttons_frame, text="Sair", command=self.quit, width=BTN_WIDTH).pack(pady=(BTN_PADY, 0))
 
-        # Rodapé / status
-        self.lbl_status = tk.Label(
-            self,
-            text="Pronto.",
-            font=("Segoe UI", 9),
-            bg="#111",
-            fg="#888",
-        )
-        self.lbl_status.pack(side="bottom", pady=10)
+        container.columnconfigure(0, weight=1)
+        buttons_frame.columnconfigure(0, weight=1)
 
-    def _styled_entry(self, label_text: str, key: str):
-        """Cria label e campo de entrada com estilo moderno."""
-        frame = tk.Frame(self, bg="#111")
-        frame.pack(pady=8)
-
-        tk.Label(frame, text=label_text, bg="#111", fg="#fff", font=("Segoe UI", 10)).pack(anchor="w")
-
-        entry = tk.Entry(
-            frame,
-            width=45,
-            bg="#222",
-            fg="#fff",
-            insertbackground="#00d4ff",
-            relief="flat",
-            font=("Segoe UI", 10),
-        )
-        entry.pack(ipady=5, pady=(2, 0))
-
-        setattr(self, f"entry_{key}", entry)
-
-    def _add_action_button(self, parent, text, command, row):
-        """Cria botões com estilo moderno e hover."""
-        def on_enter(e):
-            btn.config(bg="#00aee0")
-
-        def on_leave(e):
-            btn.config(bg="#00d4ff")
-
-        btn = tk.Button(
-            parent,
-            text=text,
-            font=("Segoe UI", 10, "bold"),
-            bg="#00d4ff",
-            fg="black",
-            relief="flat",
-            width=25,
-            height=2,
-            command=command,
-        )
-        btn.grid(row=row, column=0, pady=5)
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
+    def _add_button(self, parent, text, command, width, pady):
+        ttk.Button(parent, text=text, command=command, width=width).pack(pady=pady)
 
     # --------------------------------------------------
-    # Ações
+    # Ações Git
     # --------------------------------------------------
     def select_repo(self):
         path = filedialog.askdirectory(title="Selecione a pasta do repositório Git")
         if not path:
             return
-
         self.repo_path = Path(path)
         info = try_get_repo_info(self.repo_path)
+        self.entry_repo.state(["!disabled"])
+        self.entry_repo.delete(0, tk.END)
         if info:
-            summary = f"{info.full_name} ({info.host})"
-            branch = get_current_branch(self.repo_path)
-            self.lbl_repo_info.config(text=f"📂 {summary}")
-            self.lbl_branch.config(text=f"🌿 Branch atual: {branch}")
-            self._set_status(f"Repositório carregado: {summary}")
+            summary = f"{info.full_name} ({info.host}) — Branch atual: {get_current_branch(self.repo_path)}"
+            self.entry_repo.insert(0, summary)
         else:
-            self.lbl_repo_info.config(text="⚠️ Repositório inválido ou sem remoto configurado.")
-            self.lbl_branch.config(text="")
-            self._set_status("Erro ao ler o repositório.")
+            self.entry_repo.insert(0, "⚠️ Repositório inválido ou sem remoto configurado.")
+        self.entry_repo.state(["disabled"])
 
-    def handle_create_branch(self):
+    def on_atualizar_branch(self):
         if not self.repo_path:
-            messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
-            return
-
-        name = self.entry_branch.get().strip()
-        if not name:
-            messagebox.showinfo("Info", "Informe o nome da nova branch (ex: feature/minha-funcionalidade).")
-            return
-
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
         try:
-            created = create_branch(self.repo_path, name)
-            self.lbl_branch.config(text=f"🌿 Nova branch: {created}")
-            self._set_status(f"Branch criada: {created}")
-            messagebox.showinfo("Sucesso", f"Branch '{created}' criada com sucesso!")
+            run_git_command(self.repo_path, ["pull"])
+            messagebox.showinfo("Atualização", "Branch atualizada com sucesso!")
         except GitCommandError as e:
-            self._set_status("Erro ao criar branch.")
-            messagebox.showerror("Erro ao criar branch", str(e))
+            messagebox.showerror("Erro", str(e))
 
-    def handle_commit_push(self):
+    def on_checkout_branch(self):
         if not self.repo_path:
-            messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        branch = self._input_popup("Checkout de Branch", "Informe o nome da branch:")
+        if not branch:
             return
+        try:
+            run_git_command(self.repo_path, ["checkout", branch])
+            messagebox.showinfo("Sucesso", f"Feito checkout para: {branch}")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
 
-        msg = self.entry_commit.get().strip()
+    def on_criar_branch(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        branch = self._input_popup("Criar Branch", "Nome da nova branch:")
+        if not branch:
+            return
+        try:
+            create_branch(self.repo_path, branch)
+            messagebox.showinfo("Sucesso", f"Branch '{branch}' criada com sucesso!")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
+
+    def on_fazer_commit(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        msg = self._input_popup("Fazer Commit", "Mensagem do commit:")
         if not msg:
-            messagebox.showinfo("Info", "Informe uma mensagem de commit.")
             return
+        try:
+            run_git_command(self.repo_path, ["add", "."])
+            run_git_command(self.repo_path, ["commit", "-m", msg])
+            messagebox.showinfo("Sucesso", f"Commit criado:\n\n{msg}")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
 
+    def on_commit_push(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        msg = self._input_popup("Commit + Push", "Mensagem do commit:")
+        if not msg:
+            return
         try:
             branch, remote = commit_and_push(self.repo_path, msg)
-            self._set_status(f"Commit enviado ({branch})")
-            messagebox.showinfo("Sucesso", f"✅ Commit enviado!\n\nBranch: {branch}\nRepo: {remote}")
+            messagebox.showinfo("Sucesso", f"Commit enviado!\n\nBranch: {branch}\nRepo: {remote}")
         except GitCommandError as e:
-            self._set_status("Erro ao enviar commit.")
-            messagebox.showerror("Erro ao enviar commit", str(e))
+            messagebox.showerror("Erro", str(e))
 
-    def handle_merge_main(self):
+    def on_criar_pr(self):
         if not self.repo_path:
-            messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        title = self._input_popup("Criar Pull Request", "Título do Pull Request:")
+        if not title:
             return
-
         try:
-            merge_to_main(self.repo_path)
-            self._set_status("Merge concluído.")
-            messagebox.showinfo("Merge", "Merge concluído com sucesso!")
-        except GitCommandError as e:
-            self._set_status("Erro ao fazer merge.")
-            messagebox.showerror("Erro ao fazer merge", str(e))
+            pr_url = create_pull_request(self.repo_path, title=title)
+            messagebox.showinfo("Pull Request", f"Pull Request criado com sucesso!\n\n{pr_url}")
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
 
-    def _set_status(self, text: str):
-        """Atualiza o status na barra inferior."""
-        self.lbl_status.config(text=text)
+    def on_merge_pr(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        pr_number = self._input_popup("Merge Pull Request", "Número do Pull Request:")
+        if not pr_number:
+            return
+        try:
+            merge_pull_request(self.repo_path, pr_number)
+            messagebox.showinfo("Merge", f"Pull Request #{pr_number} mergeado com sucesso!")
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
+
+    def on_resolver_conflitos(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        try:
+            run_git_command(self.repo_path, ["merge", "--continue"])
+            messagebox.showinfo("Conflitos", "Processo de merge continuado após resolução.")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
+
+    def on_deletar_branch(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        branch = self._input_popup("Deletar Branch", "Nome da branch:")
+        if not branch:
+            return
+        try:
+            run_git_command(self.repo_path, ["branch", "-D", branch])
+            messagebox.showinfo("Sucesso", f"Branch '{branch}' deletada localmente.")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
+
+    def on_deletar_branch_local(self):
+        self.on_deletar_branch()
+
+    def on_deletar_branch_remota(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+        branch = self._input_popup("Deletar Branch Remota", "Nome da branch remota:")
+        if not branch:
+            return
+        try:
+            run_git_command(self.repo_path, ["push", "origin", "--delete", branch])
+            messagebox.showinfo("Sucesso", f"Branch remota '{branch}' deletada.")
+        except GitCommandError as e:
+            messagebox.showerror("Erro", str(e))
+
+    # --------------------------------------------------
+    # Utilitários
+    # --------------------------------------------------
+    def _input_popup(self, title, prompt):
+        popup = tk.Toplevel(self)
+        popup.title(title)
+        popup.geometry("350x150")
+        popup.resizable(False, False)
+        ttk.Label(popup, text=prompt).pack(pady=10)
+        entry = ttk.Entry(popup, width=40)
+        entry.pack(pady=5)
+        result = {"value": None}
+
+        def confirm():
+            result["value"] = entry.get().strip()
+            popup.destroy()
+
+        ttk.Button(popup, text="Confirmar", command=confirm).pack(pady=10)
+        popup.transient(self)
+        popup.grab_set()
+        self.wait_window(popup)
+        return result["value"]
