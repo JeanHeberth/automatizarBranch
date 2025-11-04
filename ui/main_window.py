@@ -81,6 +81,7 @@ class MainWindow(tk.Tk):
 
         buttons = [
             ("🔄 Atualizar Branch", self.on_atualizar_branch),
+            ("↩️ Realizar Rollback", self.on_realizar_rollback),
             ("🌿 Checkout de Branch", self.on_checkout_branch),
             ("🌱 Criar Branch", self.on_criar_branch),
             ("💬 Fazer Commit", self.on_commit),
@@ -228,6 +229,33 @@ class MainWindow(tk.Tk):
                 self.log(f"Erro no push: {e}")
 
         self._popup("Commit + Push", "Mensagem do commit:", commit_push, entry=True)
+
+
+    def on_realizar_rollback(self):
+        if not self.repo_path:
+            messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
+            return
+
+        resposta = messagebox.askyesnocancel(
+            "Rollback",
+            "Deseja desfazer o último commit (modo leve)?\n\n"
+            "Sim → Rollback leve (mantém alterações)\n"
+            "Não → Rollback completo (descarta alterações)\n"
+            "Cancelar → volta sem fazer nada."
+        )
+
+        if resposta is None:
+            return  # cancelado
+
+            try:
+                mode = "soft" if resposta else "hard"
+                branch = rollback_last_commit(self.repo_path, mode=mode)
+                tipo = "leve" if mode == "soft" else "completo"
+                self._set_status(f"Rollback ({tipo}) concluído na branch {branch}.")
+                messagebox.showinfo("Rollback concluído", f"Rollback {tipo} realizado com sucesso!")
+            except GitCommandError as e:
+                self._set_status("Erro ao realizar rollback.")
+                messagebox.showerror("Erro no rollback", str(e))
 
     # =====================================================
     # POPUPS PADRONIZADOS
