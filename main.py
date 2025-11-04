@@ -1,4 +1,6 @@
-from gui import iniciar_interface
+# main.py
+from ui.main_window import MainWindow
 
 if __name__ == "__main__":
-    iniciar_interface()
+    app = MainWindow()
+    app.mainloop()
