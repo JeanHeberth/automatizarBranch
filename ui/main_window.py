@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from core.git_operations import run_git_command, get_current_branch
+from core.git_operations import run_git_command, get_current_branch, rollback_last_commit, GitCommandError
 from core.pr_operations import create_pull_request
 
 
@@ -230,7 +230,6 @@ class MainWindow(tk.Tk):
 
         self._popup("Commit + Push", "Mensagem do commit:", commit_push, entry=True)
 
-
     def on_realizar_rollback(self):
         if not self.repo_path:
             messagebox.showwarning("Aviso", "Selecione um repositório primeiro.")
@@ -238,24 +237,21 @@ class MainWindow(tk.Tk):
 
         resposta = messagebox.askyesnocancel(
             "Rollback",
-            "Deseja desfazer o último commit (modo leve)?\n\n"
-            "Sim → Rollback leve (mantém alterações)\n"
-            "Não → Rollback completo (descarta alterações)\n"
-            "Cancelar → volta sem fazer nada."
+            "Deseja desfazer o último commit?"
         )
 
         if resposta is None:
             return  # cancelado
 
-            try:
-                mode = "soft" if resposta else "hard"
-                branch = rollback_last_commit(self.repo_path, mode=mode)
-                tipo = "leve" if mode == "soft" else "completo"
-                self._set_status(f"Rollback ({tipo}) concluído na branch {branch}.")
-                messagebox.showinfo("Rollback concluído", f"Rollback {tipo} realizado com sucesso!")
-            except GitCommandError as e:
-                self._set_status("Erro ao realizar rollback.")
-                messagebox.showerror("Erro no rollback", str(e))
+        try:
+            mode = "soft" if resposta else "hard"
+            branch = rollback_last_commit(self.repo_path, mode=mode)
+            tipo = "" if mode == "soft" else "completo"
+            self._set_status(f"Rollback ({tipo}) concluído na branch {branch}.")
+            messagebox.showinfo(title="Rollback concluído", message=f"Rollback {tipo} realizado com sucesso!")
+        except GitCommandError as e:
+            self._set_status("Erro ao realizar rollback.")
+            messagebox.showerror(title="Erro no rollback", message=str(e))
 
     # =====================================================
     # POPUPS PADRONIZADOS
@@ -442,3 +438,9 @@ class MainWindow(tk.Tk):
             popup.destroy()
 
         ttk.Button(popup, text="Deletar", command=_del).pack(pady=12)
+
+    def _set_status(self, text: str, color: str = "#888"):
+        """Atualiza o texto da barra de status inferior."""
+        if hasattr(self, "lbl_status"):
+            self.lbl_status.config(text=text, fg=color)
+            self.lbl_status.update_idletasks()

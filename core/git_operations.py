@@ -2,6 +2,7 @@ import subprocess
 from pathlib import Path
 
 
+
 def run_git_command(repo_path, command_list):
     """Executa comandos git e retorna saída limpa."""
     result = subprocess.run(
@@ -15,13 +16,6 @@ def run_git_command(repo_path, command_list):
 # core/git_operations.py  (adicione ao final do arquivo)
 
 def rollback_last_commit(repo_path: Path, mode: str = "soft") -> str:
-    """
-    Desfaz o último commit.
-    mode:
-      - 'soft': mantém alterações no diretório (git reset --soft HEAD~1)
-      - 'hard': reverte completamente ao estado remoto (git reset --hard origin/<branch>)
-    Retorna o nome da branch revertida.
-    """
     branch = get_current_branch(repo_path)
     if mode == "soft":
         run_git_command(repo_path, ["reset", "--soft", "HEAD~1"])
@@ -36,3 +30,8 @@ def rollback_last_commit(repo_path: Path, mode: str = "soft") -> str:
 def get_current_branch(repo_path):
     """Retorna o nome da branch atual."""
     return run_git_command(repo_path, ["rev-parse", "--abbrev-ref", "HEAD"])
+
+class GitCommandError(Exception):
+    """Erro personalizado para falhas em comandos Git."""
+    pass
+
