@@ -27,25 +27,54 @@ class MainWindow(tk.Tk):
         fg_text = "#2E3440"
         border = "#C5CED8"
 
-        style.configure(".", background=bg_main, foreground=fg_text, font=("Segoe UI", 10))
+        style.configure(
+            ".",
+            background=bg_main,
+            foreground=fg_text,
+            font=("Segoe UI", 10)
+        )
         style.configure("TFrame", background=bg_main)
         style.configure("TLabel", background=bg_main, foreground=fg_text)
-        style.configure("TButton", background=bg_button, borderwidth=1, focusthickness=3, padding=6)
-        style.map("TButton", background=[("active", bg_hover)], relief=[("pressed", "groove")])
+        style.configure(
+            "TButton",
+            background=bg_button,
+            borderwidth=1,
+            focusthickness=3,
+            padding=6
+        )
+        style.map("TButton", background=[("active", bg_hover)])
         style.configure("TEntry", fieldbackground="#FFFFFF", bordercolor=border)
 
     # =====================================================
     # INTERFACE PRINCIPAL
     # =====================================================
     def _build_ui(self):
-        ttk.Label(self, text="Automação de Branches 💡", font=("Segoe UI Semibold", 16)).pack(pady=(0, 2))
-        ttk.Label(self, text="Gerencie branches, commits e PRs de forma visual e simples.", font=("Segoe UI", 10)).pack(pady=(0, 15))
+        ttk.Label(
+            self,
+            text="Automação de Branches 💡",
+            font=("Segoe UI Semibold", 16)
+        ).pack(pady=(0, 2))
 
-        ttk.Label(self, text="📁 Repositório Git:", font=("Segoe UI", 10, "bold")).pack(pady=(5, 0))
+        ttk.Label(
+            self,
+            text="Gerencie branches, commits e PRs de forma visual e simples.",
+            font=("Segoe UI", 10)
+        ).pack(pady=(0, 15))
+
+        ttk.Label(
+            self,
+            text="📁 Repositório Git:",
+            font=("Segoe UI", 10, "bold")
+        ).pack(pady=(5, 0))
+
         self.repo_entry = ttk.Entry(self, width=80, state="readonly")
         self.repo_entry.pack(pady=5)
 
-        ttk.Button(self, text="Selecionar Repositório", command=self.on_select_repo).pack(pady=(5, 15), fill="x")
+        ttk.Button(
+            self,
+            text="Selecionar Repositório",
+            command=self.on_select_repo
+        ).pack(pady=(5, 15), fill="x")
 
         button_frame = ttk.Frame(self)
         button_frame.pack(pady=5)
@@ -67,8 +96,21 @@ class MainWindow(tk.Tk):
         for text, cmd in buttons:
             ttk.Button(button_frame, text=text, command=cmd).pack(pady=4, fill="x")
 
-        ttk.Label(self, text="\n🧾 Logs de Execução:", font=("Segoe UI", 10, "bold")).pack(pady=(15, 5))
-        self.log_text = tk.Text(self, height=10, width=80, state="disabled", bg="#F3F6FA", fg="#2E3440", relief="flat")
+        ttk.Label(
+            self,
+            text="\n🧾 Logs de Execução:",
+            font=("Segoe UI", 10, "bold")
+        ).pack(pady=(15, 5))
+
+        self.log_text = tk.Text(
+            self,
+            height=10,
+            width=80,
+            state="disabled",
+            bg="#F3F6FA",
+            fg="#2E3440",
+            relief="flat"
+        )
         self.log_text.pack(pady=(0, 5))
 
     # =====================================================
@@ -97,7 +139,11 @@ class MainWindow(tk.Tk):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
 
-        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
+        branches = [
+            b.replace("*", "").strip()
+            for b in run_git_command(self.repo_path, ["branch"]).splitlines()
+            if b.strip()
+        ]
 
         def atualizar(branch):
             try:
@@ -114,7 +160,12 @@ class MainWindow(tk.Tk):
     def on_checkout_branch(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
+
+        branches = [
+            b.replace("*", "").strip()
+            for b in run_git_command(self.repo_path, ["branch"]).splitlines()
+            if b.strip()
+        ]
 
         def checkout(branch):
             try:
@@ -215,7 +266,11 @@ class MainWindow(tk.Tk):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
 
-        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
+        branches = [
+            b.replace("*", "").strip()
+            for b in run_git_command(self.repo_path, ["branch"]).splitlines()
+            if b.strip()
+        ]
 
         popup = tk.Toplevel(self)
         popup.title("Criar Pull Request")
@@ -264,7 +319,7 @@ class MainWindow(tk.Tk):
             self.log("Merge continuado com sucesso.")
         except Exception:
             status = run_git_command(self.repo_path, ["status", "--porcelain"])
-            conflitos = [l for l in status.splitlines() if l.startswith("UU ")]
+            conflitos = [line for line in status.splitlines() if line.startswith("UU ")]
             if conflitos:
                 msg = "Arquivos em conflito:\n" + "\n".join(f"• {c[3:]}" for c in conflitos)
                 messagebox.showwarning("Conflitos Encontrados", msg)
@@ -276,16 +331,20 @@ class MainWindow(tk.Tk):
     def on_deletar_todas(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-        if not messagebox.askyesno("Confirmação", "Deseja deletar TODAS as branches locais (exceto main/master/develop)?"):
+        if not messagebox.askyesno("Confirmação",
+                                   "Deseja deletar TODAS as branches locais (exceto main/master/develop)?"):
             return
+
         raw = run_git_command(self.repo_path, ["branch"]).splitlines()
         locals_ = [b.replace("*", "").strip() for b in raw if b.strip()]
         protegidas = {"main", "master", "develop"}
         deletadas = []
+
         for br in locals_:
             if br not in protegidas:
                 run_git_command(self.repo_path, ["branch", "-D", br])
                 deletadas.append(br)
+
         if deletadas:
             messagebox.showinfo("Sucesso", f"🧹 Branches deletadas: {', '.join(deletadas)}")
             self.log(f"Branches locais removidas: {', '.join(deletadas)}")
@@ -295,7 +354,11 @@ class MainWindow(tk.Tk):
     def on_deletar_local(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-        locals_ = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
+        locals_ = [
+            b.replace("*", "").strip()
+            for b in run_git_command(self.repo_path, ["branch"]).splitlines()
+            if b.strip()
+        ]
         if not locals_:
             return messagebox.showinfo("Branches", "Nenhuma branch local encontrada.")
 
@@ -323,9 +386,11 @@ class MainWindow(tk.Tk):
     def on_deletar_remota(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
         raw = run_git_command(self.repo_path, ["branch", "-r"]).splitlines()
-        remotas = [l.strip().replace("origin/", "") for l in raw if "origin/" in l]
+        remotas = [b.strip().replace("origin/", "") for b in raw if "origin/" in b]
         remotas = sorted(set(remotas))
+
         if not remotas:
             return messagebox.showinfo("Branches", "Nenhuma branch remota encontrada.")
 
