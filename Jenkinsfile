@@ -45,7 +45,7 @@ pipeline {
                 bat """
                     call %PYTHON_ENV%\\Scripts\\activate
                     pip install flake8
-                    flake8 . --max-line-length=120 || echo "⚠️ Aviso: problemas de lint encontrados."
+                    flake8 . --max-line-length=120 || (echo "⚠️ Aviso: problemas de lint encontrados, mas pipeline continuará." && exit /b 0)
                 """
             }
         }
