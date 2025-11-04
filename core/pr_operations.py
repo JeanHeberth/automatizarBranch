@@ -1,4 +1,3 @@
-# core/pr_operations.py
 import requests
 import webbrowser
 from core.env_utils import require_github_token
@@ -6,7 +5,6 @@ from utils.repo_utils import get_repo_info
 from core.git_operations import get_current_branch
 
 GITHUB_API = "https://api.github.com"
-
 
 def create_pull_request(repo_path, base="main", title=None, body=""):
     """Cria um Pull Request via GitHub API."""
@@ -23,13 +21,14 @@ def create_pull_request(repo_path, base="main", title=None, body=""):
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
 
     response = requests.post(url, json=payload, headers=headers)
+    if response.status_code == 422 and "already exists" in response.text:
+        raise RuntimeError("Já existe um Pull Request aberto entre essas branches.")
     if response.status_code not in (200, 201):
         raise RuntimeError(f"Erro ao criar PR: {response.status_code} {response.text}")
 
     pr_url = response.json()["html_url"]
     webbrowser.open(pr_url)
     return pr_url
-
 
 def merge_pull_request(repo_path, pr_number):
     """Faz merge de um PR via API do GitHub."""
@@ -42,7 +41,6 @@ def merge_pull_request(repo_path, pr_number):
     if response.status_code != 200:
         raise RuntimeError(f"Erro ao fazer merge do PR: {response.status_code} {response.text}")
     return response.json()
-
 
 def list_open_pull_requests(repo_path):
     """Retorna todos os PRs abertos no repositório."""
@@ -57,25 +55,3 @@ def list_open_pull_requests(repo_path):
 
     prs = response.json()
     return [f"#{pr['number']} — {pr['title']}" for pr in prs]
-
-
-def select_and_merge_pull_request(repo_path):
-    """
-    Permite ao usuário selecionar e mesclar um PR aberto.
-    Retorna a mensagem de sucesso ou lança erro.
-    """
-    prs = list_open_pull_requests(repo_path)
-    if not prs:
-        raise RuntimeError("Nenhum Pull Request aberto encontrado.")
-
-    print("\nPRs disponíveis:")
-    for i, pr in enumerate(prs, 1):
-        print(f"{i}. {pr}")
-
-    escolha = input("\nDigite o número do PR para mesclar: ")
-    try:
-        pr_id = int(prs[int(escolha) - 1].split("—")[0].replace("#", "").strip())
-        result = merge_pull_request(repo_path, pr_id)
-        return f"✅ Merge do PR #{pr_id} concluído com sucesso!"
-    except Exception as e:
-        raise RuntimeError(f"Erro ao mesclar PR: {e}")
