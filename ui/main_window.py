@@ -1,54 +1,79 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from core.git_operations import run_git_command
+from core.git_operations import run_git_command, get_current_branch
 from core.pr_operations import create_pull_request
-from core.git_operations import get_current_branch
-import os
 
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("🚀 Automação Git com Tkinter")
-        self.geometry("620x750")
-        self.configure(padx=20, pady=20)
+        self.geometry("640x770")
+        self.configure(bg="#F9FAFB", padx=25, pady=25)
         self.repo_path = None
+        self._setup_theme()
         self._build_ui()
 
-    # ----------------------------------------------------
-    # INTERFACE
-    # ----------------------------------------------------
+    # =====================================================
+    # CONFIGURAÇÃO VISUAL
+    # =====================================================
+    def _setup_theme(self):
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        bg_main = "#F9FAFB"
+        bg_button = "#D7E3F4"
+        bg_hover = "#C7D8EE"
+        fg_text = "#2E3440"
+        border = "#C5CED8"
+
+        style.configure(".", background=bg_main, foreground=fg_text, font=("Segoe UI", 10))
+        style.configure("TFrame", background=bg_main)
+        style.configure("TLabel", background=bg_main, foreground=fg_text)
+        style.configure("TButton", background=bg_button, borderwidth=1, focusthickness=3, padding=6)
+        style.map("TButton", background=[("active", bg_hover)], relief=[("pressed", "groove")])
+        style.configure("TEntry", fieldbackground="#FFFFFF", bordercolor=border)
+
+    # =====================================================
+    # INTERFACE PRINCIPAL
+    # =====================================================
     def _build_ui(self):
-        ttk.Label(self, text="Repositório Git:", font=("Segoe UI", 10)).pack(pady=(5, 0))
+        ttk.Label(self, text="Automação de Branches 💡", font=("Segoe UI Semibold", 16)).pack(pady=(0, 2))
+        ttk.Label(self, text="Gerencie branches, commits e PRs de forma visual e simples.", font=("Segoe UI", 10)).pack(pady=(0, 15))
+
+        ttk.Label(self, text="📁 Repositório Git:", font=("Segoe UI", 10, "bold")).pack(pady=(5, 0))
         self.repo_entry = ttk.Entry(self, width=80, state="readonly")
         self.repo_entry.pack(pady=5)
 
-        ttk.Button(self, text="Selecionar Repositório", command=self.on_select_repo).pack(pady=5)
+        ttk.Button(self, text="Selecionar Repositório", command=self.on_select_repo).pack(pady=(5, 15), fill="x")
+
+        button_frame = ttk.Frame(self)
+        button_frame.pack(pady=5)
 
         buttons = [
-            ("Atualizar Branch", self.on_atualizar_branch),
-            ("Checkout de Branch", self.on_checkout_branch),
-            ("Criar Branch", self.on_criar_branch),
-            ("Fazer Commit", self.on_commit),
-            ("Commit + Push", self.on_commit_push),
-            ("Criar Pull Request", self.on_criar_pr),
-            ("Resolver Conflitos", self.on_resolver_conflitos),
-            ("Deletar Branch", self.on_deletar_todas),
-            ("Deletar Branch Local", self.on_deletar_local),
-            ("Deletar Branch Remota", self.on_deletar_remota),
-            ("Sair", self.destroy)
+            ("🔄 Atualizar Branch", self.on_atualizar_branch),
+            ("🌿 Checkout de Branch", self.on_checkout_branch),
+            ("🌱 Criar Branch", self.on_criar_branch),
+            ("💬 Fazer Commit", self.on_commit),
+            ("💾 Commit + Push", self.on_commit_push),
+            ("🔗 Criar Pull Request", self.on_criar_pr),
+            ("🧩 Resolver Conflitos", self.on_resolver_conflitos),
+            ("🧹 Deletar Branch (Todas Locais)", self.on_deletar_todas),
+            ("🗑️ Deletar Branch Local", self.on_deletar_local),
+            ("🚮 Deletar Branch Remota", self.on_deletar_remota),
+            ("❌ Sair", self.destroy)
         ]
 
         for text, cmd in buttons:
-            ttk.Button(self, text=text, command=cmd).pack(pady=4, fill="x")
+            ttk.Button(button_frame, text=text, command=cmd).pack(pady=4, fill="x")
 
-        ttk.Label(self, text="\nLogs de Execução:", font=("Segoe UI", 10, "bold")).pack(pady=10)
-        self.log_text = tk.Text(self, height=10, width=80, state="disabled", bg="#f7f7f7")
-        self.log_text.pack()
+        ttk.Label(self, text="\n🧾 Logs de Execução:", font=("Segoe UI", 10, "bold")).pack(pady=(15, 5))
+        self.log_text = tk.Text(self, height=10, width=80, state="disabled", bg="#F3F6FA", fg="#2E3440", relief="flat")
+        self.log_text.pack(pady=(0, 5))
 
-    # ----------------------------------------------------
-    # FUNÇÕES GIT
-    # ----------------------------------------------------
+    # =====================================================
+    # UTILITÁRIOS
+    # =====================================================
     def log(self, text):
         self.log_text.config(state="normal")
         self.log_text.insert("end", f"[LOG] {text}\n")
@@ -65,78 +90,137 @@ class MainWindow(tk.Tk):
             self.repo_entry.config(state="readonly")
             self.log(f"Repositório selecionado: {repo}")
 
+    # =====================================================
+    # OPERAÇÕES GIT
+    # =====================================================
     def on_atualizar_branch(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
 
-        branches_output = run_git_command(self.repo_path, ["branch"]).splitlines()
-        branches = [b.replace("*", "").strip() for b in branches_output if b.strip()]
+        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
 
-        popup = tk.Toplevel(self)
-        popup.title("Atualizar Branch")
-        popup.geometry("400x200")
-
-        ttk.Label(popup, text="Selecione uma branch para atualizar:").pack(pady=10)
-        var = tk.StringVar(value=branches[0])
-        combo = ttk.Combobox(popup, textvariable=var, values=branches, state="readonly", width=40)
-        combo.pack(pady=5)
-
-        def atualizar():
-            branch = var.get()
+        def atualizar(branch):
             try:
                 run_git_command(self.repo_path, ["checkout", branch])
                 run_git_command(self.repo_path, ["pull", "origin", branch])
                 messagebox.showinfo("Sucesso", f"✅ Branch '{branch}' atualizada com sucesso.")
                 self.log(f"Branch '{branch}' atualizada.")
-                popup.destroy()
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao atualizar '{branch}': {e}")
+                self.log(f"Erro ao atualizar branch: {e}")
 
-        ttk.Button(popup, text="Atualizar", command=atualizar).pack(pady=10)
+        self._popup("Atualizar Branch", "Selecione uma branch para atualizar:", atualizar, combo_values=branches)
 
     def on_checkout_branch(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
 
-        branches_output = run_git_command(self.repo_path, ["branch"]).splitlines()
-        branches = [b.replace("*", "").strip() for b in branches_output if b.strip()]
-
-        popup = tk.Toplevel(self)
-        popup.title("Checkout de Branch")
-        popup.geometry("400x200")
-
-        ttk.Label(popup, text="Escolha uma branch:").pack(pady=10)
-        var = tk.StringVar(value=branches[0])
-        combo = ttk.Combobox(popup, textvariable=var, values=branches, state="readonly", width=40)
-        combo.pack(pady=5)
-
-        def confirmar():
-            branch = var.get()
+        def checkout(branch):
             try:
                 run_git_command(self.repo_path, ["checkout", branch])
-                messagebox.showinfo("Sucesso", f"✅ Feito checkout para '{branch}'.")
-                self.log(f"Checkout realizado: {branch}")
-                popup.destroy()
+                messagebox.showinfo("Sucesso", f"✅ Checkout realizado para '{branch}'.")
+                self.log(f"Checkout em {branch}.")
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao trocar de branch: {e}")
+                self.log(f"Erro ao fazer checkout: {e}")
+
+        self._popup("Checkout de Branch", "Escolha uma branch:", checkout, combo_values=branches)
+
+    def on_criar_branch(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        def criar(nome):
+            if not nome.strip():
+                return messagebox.showwarning("Aviso", "Informe o nome da branch.")
+            try:
+                run_git_command(self.repo_path, ["checkout", "-b", nome])
+                messagebox.showinfo("Sucesso", f"🌱 Branch '{nome}' criada com sucesso.")
+                self.log(f"Branch criada: {nome}")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                self.log(f"Erro ao criar branch: {e}")
+
+        self._popup("Criar Branch", "Digite o nome da nova branch:", criar, entry=True)
+
+    def on_commit(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        def commit(msg):
+            try:
+                run_git_command(self.repo_path, ["add", "."])
+                run_git_command(self.repo_path, ["commit", "-m", msg])
+                messagebox.showinfo("Sucesso", f"✅ Commit realizado: {msg}")
+                self.log(f"Commit realizado: {msg}")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                self.log(f"Erro no commit: {e}")
+
+        self._popup("Fazer Commit", "Mensagem do commit:", commit, entry=True)
+
+    def on_commit_push(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        def commit_push(msg):
+            try:
+                branch = get_current_branch(self.repo_path)
+                run_git_command(self.repo_path, ["add", "."])
+                run_git_command(self.repo_path, ["commit", "-m", msg])
+                run_git_command(self.repo_path, ["push", "-u", "origin", branch])
+                messagebox.showinfo("Sucesso", f"✅ Commit e Push enviados para 'origin/{branch}'.")
+                self.log(f"Commit + push para {branch}.")
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                self.log(f"Erro no push: {e}")
+
+        self._popup("Commit + Push", "Mensagem do commit:", commit_push, entry=True)
+
+    # =====================================================
+    # POPUPS PADRONIZADOS
+    # =====================================================
+    def _popup(self, title, label_text, callback, entry=False, combo_values=None):
+        popup = tk.Toplevel(self)
+        popup.title(title)
+        popup.geometry("420x200")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text=label_text, font=("Segoe UI", 10)).pack(pady=(10, 5))
+        var = tk.StringVar()
+        widget = None
+
+        if combo_values:
+            widget = ttk.Combobox(popup, textvariable=var, values=combo_values, state="readonly", width=40)
+            var.set(combo_values[0])
+        elif entry:
+            widget = ttk.Entry(popup, textvariable=var, width=45)
+
+        if widget:
+            widget.pack(pady=10)
+
+        def confirmar():
+            value = var.get()
+            popup.destroy()
+            callback(value)
 
         ttk.Button(popup, text="Confirmar", command=confirmar).pack(pady=10)
 
+    # =====================================================
+    # PULL REQUESTS, CONFLITOS E DELEÇÕES
+    # =====================================================
     def on_criar_pr(self):
         if not self.repo_path:
-            messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
-            return
+            return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
 
-        branches_output = run_git_command(self.repo_path, ["branch"]).splitlines()
-        branches = [b.replace("*", "").strip() for b in branches_output if b.strip()]
+        branches = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
 
         popup = tk.Toplevel(self)
         popup.title("Criar Pull Request")
         popup.geometry("420x260")
+        popup.configure(bg="#F9FAFB")
 
         ttk.Label(popup, text="Branch Base (para onde vai o PR):").pack(pady=5)
         base_var = tk.StringVar(value=branches[0])
@@ -169,230 +253,99 @@ class MainWindow(tk.Tk):
                 messagebox.showerror("Erro", str(e))
                 self.log(f"Erro ao criar PR: {e}")
 
-        ttk.Button(popup, text="Criar Pull Request", command=criar_pr).pack(pady=10)
+        ttk.Button(popup, text="Criar Pull Request", command=criar_pr).pack(pady=15)
 
-    # ----------------------------------------------------
-    # CRIAR BRANCH
-    # ----------------------------------------------------
-    def on_criar_branch(self):
-        if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
-
-        popup = tk.Toplevel(self)
-        popup.title("Criar Nova Branch")
-        popup.geometry("400x200")
-
-        ttk.Label(popup, text="Digite o nome da nova branch (feature/...):").pack(pady=10)
-        nome_var = tk.StringVar()
-        entry = ttk.Entry(popup, textvariable=nome_var, width=45)
-        entry.pack(pady=5)
-
-        def criar():
-            nome = nome_var.get().strip()
-            if not nome:
-                messagebox.showwarning("Aviso", "Informe o nome da branch.")
-                return
-            try:
-                run_git_command(self.repo_path, ["checkout", "-b", nome])
-                messagebox.showinfo("Sucesso", f"🌱 Branch '{nome}' criada com sucesso.")
-                self.log(f"Nova branch criada: {nome}")
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao criar branch: {e}")
-
-        ttk.Button(popup, text="Criar Branch", command=criar).pack(pady=10)
-
-    # ----------------------------------------------------
-    # COMMIT SIMPLES
-    # ----------------------------------------------------
-    def on_commit(self):
-        if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
-
-        popup = tk.Toplevel(self)
-        popup.title("Fazer Commit")
-        popup.geometry("400x200")
-
-        ttk.Label(popup, text="Mensagem do commit:").pack(pady=10)
-        msg_var = tk.StringVar()
-        entry = ttk.Entry(popup, textvariable=msg_var, width=45)
-        entry.pack(pady=5)
-
-        def commit():
-            msg = msg_var.get().strip()
-            if not msg:
-                messagebox.showwarning("Aviso", "Informe uma mensagem de commit.")
-                return
-            try:
-                run_git_command(self.repo_path, ["add", "."])
-                run_git_command(self.repo_path, ["commit", "-m", msg])
-                messagebox.showinfo("Sucesso", f"✅ Commit realizado: {msg}")
-                self.log(f"Commit realizado: {msg}")
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao realizar commit: {e}")
-
-        ttk.Button(popup, text="Confirmar Commit", command=commit).pack(pady=10)
-
-    # ----------------------------------------------------
-    # COMMIT + PUSH
-    # ----------------------------------------------------
-    def on_commit_push(self):
-        if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
-
-        popup = tk.Toplevel(self)
-        popup.title("Commit + Push")
-        popup.geometry("400x200")
-
-        ttk.Label(popup, text="Mensagem do commit:").pack(pady=10)
-        msg_var = tk.StringVar()
-        entry = ttk.Entry(popup, textvariable=msg_var, width=45)
-        entry.pack(pady=5)
-
-        def enviar():
-            msg = msg_var.get().strip()
-            if not msg:
-                messagebox.showwarning("Aviso", "Informe uma mensagem de commit.")
-                return
-            try:
-                branch = get_current_branch(self.repo_path)
-                run_git_command(self.repo_path, ["add", "."])
-                run_git_command(self.repo_path, ["commit", "-m", msg])
-                run_git_command(self.repo_path, ["push", "-u", "origin", branch])
-                messagebox.showinfo("Sucesso", f"✅ Commit enviado para 'origin/{branch}'.")
-                self.log(f"Commit + push concluído em {branch}")
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao enviar commit: {e}")
-
-        ttk.Button(popup, text="Commit e Enviar", command=enviar).pack(pady=10)
-
-    # ----------------------------------------------------
-    # RESOLVER CONFLITOS
-    # ----------------------------------------------------
     def on_resolver_conflitos(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
         try:
             run_git_command(self.repo_path, ["merge", "--continue"])
-            messagebox.showinfo("Sucesso", "✅ Conflitos resolvidos com sucesso (merge continuado).")
-            self.log("Conflitos resolvidos e merge finalizado.")
-        except Exception as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(f"Erro ao resolver conflitos: {e}")
+            messagebox.showinfo("Resolver Conflitos", "✅ Merge continuado com sucesso.")
+            self.log("Merge continuado com sucesso.")
+        except Exception:
+            status = run_git_command(self.repo_path, ["status", "--porcelain"])
+            conflitos = [l for l in status.splitlines() if l.startswith("UU ")]
+            if conflitos:
+                msg = "Arquivos em conflito:\n" + "\n".join(f"• {c[3:]}" for c in conflitos)
+                messagebox.showwarning("Conflitos Encontrados", msg)
+                self.log(msg)
+            else:
+                messagebox.showinfo("Resolver Conflitos", "Nenhum merge pendente ou conflito encontrado.")
+                self.log("Nenhum merge pendente ou conflito encontrado.")
 
-    # ----------------------------------------------------
-    # DELETAR TODAS AS BRANCHES LOCAIS (menos develop/main/master)
-    # ----------------------------------------------------
     def on_deletar_todas(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+        if not messagebox.askyesno("Confirmação", "Deseja deletar TODAS as branches locais (exceto main/master/develop)?"):
             return
+        raw = run_git_command(self.repo_path, ["branch"]).splitlines()
+        locals_ = [b.replace("*", "").strip() for b in raw if b.strip()]
+        protegidas = {"main", "master", "develop"}
+        deletadas = []
+        for br in locals_:
+            if br not in protegidas:
+                run_git_command(self.repo_path, ["branch", "-D", br])
+                deletadas.append(br)
+        if deletadas:
+            messagebox.showinfo("Sucesso", f"🧹 Branches deletadas: {', '.join(deletadas)}")
+            self.log(f"Branches locais removidas: {', '.join(deletadas)}")
+        else:
+            messagebox.showinfo("Aviso", "Nenhuma branch deletada (todas protegidas).")
 
-        confirm = messagebox.askyesno("Confirmação",
-                                      "Deseja realmente deletar TODAS as branches locais (exceto main, master e develop)?")
-        if not confirm:
-            return
-
-        try:
-            branches_output = run_git_command(self.repo_path, ["branch"]).splitlines()
-            branches = [b.replace("*", "").strip() for b in branches_output if b.strip()]
-            protegidas = ["main", "master", "develop"]
-            deletadas = []
-
-            for branch in branches:
-                if branch not in protegidas:
-                    try:
-                        run_git_command(self.repo_path, ["branch", "-D", branch])
-                        deletadas.append(branch)
-                    except Exception:
-                        pass
-
-            if deletadas:
-                messagebox.showinfo("Sucesso", f"🧹 Branches deletadas: {', '.join(deletadas)}")
-                self.log(f"Branches removidas: {', '.join(deletadas)}")
-            else:
-                messagebox.showinfo("Aviso", "Nenhuma branch foi deletada (todas protegidas).")
-
-        except Exception as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(f"Erro ao deletar branches: {e}")
-
-    # ----------------------------------------------------
-    # DELETAR BRANCH LOCAL (escolher)
-    # ----------------------------------------------------
     def on_deletar_local(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+        locals_ = [b.replace("*", "").strip() for b in run_git_command(self.repo_path, ["branch"]).splitlines() if b.strip()]
+        if not locals_:
+            return messagebox.showinfo("Branches", "Nenhuma branch local encontrada.")
 
-        branches_output = run_git_command(self.repo_path, ["branch"]).splitlines()
-        branches = [b.replace("*", "").strip() for b in branches_output if b.strip()]
         popup = tk.Toplevel(self)
         popup.title("Deletar Branch Local")
         popup.geometry("400x200")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
 
-        ttk.Label(popup, text="Selecione uma branch local para deletar:").pack(pady=10)
-        var = tk.StringVar(value=branches[0])
-        combo = ttk.Combobox(popup, textvariable=var, values=branches, state="readonly", width=40)
-        combo.pack(pady=5)
+        ttk.Label(popup, text="Selecione a branch local:").pack(pady=10)
+        var = tk.StringVar(value=locals_[0])
+        ttk.Combobox(popup, textvariable=var, values=locals_, state="readonly", width=40).pack(pady=5)
 
-        def deletar():
-            branch = var.get()
-            if branch in ["main", "master", "develop"]:
-                messagebox.showwarning("Protegida", f"⚠️ Branch '{branch}' é protegida e não pode ser deletada.")
-                return
-            try:
-                run_git_command(self.repo_path, ["branch", "-D", branch])
-                messagebox.showinfo("Sucesso", f"🗑️ Branch local '{branch}' removida com sucesso.")
-                self.log(f"Branch local deletada: {branch}")
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao deletar branch local: {e}")
+        def _del():
+            br = var.get()
+            if br in {"main", "master", "develop"}:
+                return messagebox.showwarning("Protegida", f"⚠️ '{br}' é protegida e não pode ser deletada.")
+            run_git_command(self.repo_path, ["branch", "-D", br])
+            messagebox.showinfo("Sucesso", f"🗑️ Branch local '{br}' removida.")
+            self.log(f"Branch local deletada: {br}")
+            popup.destroy()
 
-        ttk.Button(popup, text="Deletar", command=deletar).pack(pady=10)
+        ttk.Button(popup, text="Deletar", command=_del).pack(pady=12)
 
-    # ----------------------------------------------------
-    # DELETAR BRANCH REMOTA (escolher)
-    # ----------------------------------------------------
     def on_deletar_remota(self):
         if not self.repo_path:
-            messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-            return
-
-        branches_output = run_git_command(self.repo_path, ["branch", "-r"]).splitlines()
-        branches = [b.strip().replace("origin/", "") for b in branches_output if "origin/" in b]
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+        raw = run_git_command(self.repo_path, ["branch", "-r"]).splitlines()
+        remotas = [l.strip().replace("origin/", "") for l in raw if "origin/" in l]
+        remotas = sorted(set(remotas))
+        if not remotas:
+            return messagebox.showinfo("Branches", "Nenhuma branch remota encontrada.")
 
         popup = tk.Toplevel(self)
         popup.title("Deletar Branch Remota")
         popup.geometry("400x200")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
 
-        ttk.Label(popup, text="Selecione uma branch remota para deletar:").pack(pady=10)
-        var = tk.StringVar(value=branches[0])
-        combo = ttk.Combobox(popup, textvariable=var, values=branches, state="readonly", width=40)
-        combo.pack(pady=5)
+        ttk.Label(popup, text="Selecione a branch remota:").pack(pady=10)
+        var = tk.StringVar(value=remotas[0])
+        ttk.Combobox(popup, textvariable=var, values=remotas, state="readonly", width=40).pack(pady=5)
 
-        def deletar():
-            branch = var.get()
-            if branch in ["main", "master", "develop"]:
-                messagebox.showwarning("Protegida", f"⚠️ Branch '{branch}' é protegida e não pode ser deletada.")
-                return
-            try:
-                run_git_command(self.repo_path, ["push", "origin", "--delete", branch])
-                messagebox.showinfo("Sucesso", f"🗑️ Branch remota '{branch}' deletada com sucesso.")
-                self.log(f"Branch remota removida: {branch}")
-                popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao deletar branch remota: {e}")
+        def _del():
+            br = var.get()
+            if br in {"main", "master", "develop"}:
+                return messagebox.showwarning("Protegida", f"⚠️ '{br}' é protegida e não pode ser deletada.")
+            run_git_command(self.repo_path, ["push", "origin", "--delete", br])
+            messagebox.showinfo("Sucesso", f"🗑️ Branch remota '{br}' deletada.")
+            self.log(f"Branch remota deletada: {br}")
+            popup.destroy()
 
-        ttk.Button(popup, text="Deletar", command=deletar).pack(pady=10)
+        ttk.Button(popup, text="Deletar", command=_del).pack(pady=12)
