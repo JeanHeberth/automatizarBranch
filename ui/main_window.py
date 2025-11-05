@@ -306,9 +306,6 @@ class MainWindow(tk.Tk):
                 self.log(f"Erro ao criar PR: {e}")
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
-        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
-
-        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
     # =====================================================
     # MERGE PULL REQUEST
@@ -339,8 +336,24 @@ class MainWindow(tk.Tk):
                 messagebox.showerror("Erro no Merge PR", str(e))
                 self.log(f"Erro ao mesclar PR: {e}")
 
-        ttk.Button(popup, text="Fazer Merge do PR", command=confirmar).pack(pady=10)
-        ttk.Button(popup, text="Cancelar", command=popup.destroy).pack(pady=(0, 10))
+        button_frame = ttk.Frame(popup)
+        button_frame.pack(pady=20)
+
+        button_width = 15
+
+        ttk.Button(
+            button_frame,
+            text="Fazer Merge do PR",
+            command=confirmar,
+            width=button_width
+        ).grid(row=0, column=0, padx=5)
+
+        ttk.Button(
+            button_frame,
+            text="Cancelar",
+            command=popup.destroy,
+            width=button_width
+        ).grid(row=0, column=1, padx=5)
 
     # =====================================================
     # DELEÇÃO DE BRANCHES
