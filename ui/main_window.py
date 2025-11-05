@@ -2,13 +2,12 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 # Importação de serviços desacoplados
-from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches, \
-    list_local_branches
+from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches
 from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
-from core.git_operations import GitCommandError
+from core.git_operations import GitCommandError, get_current_branch
 
 
 class MainWindow(tk.Tk):
@@ -152,20 +151,22 @@ class MainWindow(tk.Tk):
     def on_atualizar_branch(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
         try:
             branches = list_branches(self.repo_path)
-            self._popup("Atualizar Branch", "Selecione uma branch:", self._atualizar_action, combo_values=branches)
         except Exception as e:
-            messagebox.showerror("Erro", str(e))
+            return messagebox.showerror("Erro", str(e))
 
-    def _atualizar_action(self, branch):
-        try:
-            result = update_branch(self.repo_path, branch)
-            messagebox.showinfo("Sucesso", result)
-            self.log(result)
-        except GitCommandError as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(str(e))
+        def atualizar(branch):
+            try:
+                msg = update_branch(self.repo_path, branch)
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                self.log(f"Erro ao atualizar branch: {e}")
+
+        self._popup("Atualizar Branch", "Selecione uma branch:", atualizar, combo_values=branches)
 
     def on_checkout_branch(self):
         if not self.repo_path:
@@ -256,26 +257,28 @@ class MainWindow(tk.Tk):
             messagebox.showerror("Erro", str(e))
             self.log(str(e))
 
+        # =====================================================
+        # CRIAR PULL REQUEST
+        # =====================================================
+
     def on_criar_pr(self):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
-        try:
-            branches = list_local_branches(self.repo_path)
-        except Exception as e:
-            return messagebox.showerror("Erro", str(e))
+
+        branches = list_branches(self.repo_path)
 
         popup = tk.Toplevel(self)
         popup.title("Criar Pull Request")
-        popup.geometry("420x260")
+        popup.geometry("420x280")
         popup.configure(bg="#F9FAFB")
 
-        ttk.Label(popup, text="Branch Base (para onde vai o PR):").pack(pady=5)
-        base_var = tk.StringVar(value=branches[0])
+        ttk.Label(popup, text="Branch Base (destino do PR):").pack(pady=5)
+        base_var = tk.StringVar(value="main")
         base_combo = ttk.Combobox(popup, textvariable=base_var, values=branches, state="readonly", width=40)
         base_combo.pack()
 
-        ttk.Label(popup, text="Branch Compare (de onde vem o PR):").pack(pady=5)
-        compare_var = tk.StringVar(value=branches[1] if len(branches) > 1 else "")
+        ttk.Label(popup, text="Branch Compare (origem):").pack(pady=5)
+        compare_var = tk.StringVar(value=get_current_branch(self.repo_path))
         compare_combo = ttk.Combobox(popup, textvariable=compare_var, values=branches, state="readonly", width=40)
         compare_combo.pack()
 
@@ -290,30 +293,29 @@ class MainWindow(tk.Tk):
         base_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
         compare_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
 
-        def criar_pr():
+        def criar_pr_action():
             try:
-                result = create_pr(self.repo_path, base_var.get(), title_var.get())
-                messagebox.showinfo("Sucesso", f"✅ {result}")
-                self.log(result)
+                msg = create_pr(self.repo_path, base_var.get(), compare_var.get(), title_var.get())
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
                 popup.destroy()
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
-                self.log(str(e))
+                self.log(f"Erro ao criar PR: {e}")
 
-        ttk.Button(popup, text="Criar Pull Request", command=criar_pr).pack(pady=15)
+        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
+    # =====================================================
+    # MERGE PULL REQUEST
+    # =====================================================
     def on_merge_pr(self):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
-        try:
-            branches = list_remote_branches(self.repo_path)
-        except Exception as e:
-            return messagebox.showerror("Erro", str(e))
-
         popup = tk.Toplevel(self)
         popup.title("✅ Merge Pull Request")
         popup.geometry("420x220")
         popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
 
         ttk.Label(popup, text="Número do Pull Request (PR):").pack(pady=(20, 5))
         pr_var = tk.StringVar()
@@ -355,7 +357,7 @@ class MainWindow(tk.Tk):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
         try:
-            locals_ = list_local_branches(self.repo_path)
+            locals_ = list_branches(self.repo_path)
             self._popup("Deletar Branch Local", "Selecione uma branch:", self._del_local_action, combo_values=locals_)
         except Exception as e:
             messagebox.showerror("Erro", str(e))

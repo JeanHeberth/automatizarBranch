@@ -15,20 +15,32 @@ def list_remote_branches(repo_path: str) -> List[str]:
     return sorted(set(branches))
 
 
-def update_branch(repo_path: str, branch: str) -> None:
-    """Atualiza a branch local com a remota correspondente."""
+def update_branch(repo_path: str, branch: str) -> str:
+    """
+    Atualiza a branch local com a remota correspondente.
+    Retorna uma mensagem de sucesso.
+    """
     run_git_command(repo_path, ["checkout", branch])
     run_git_command(repo_path, ["pull", "origin", branch])
+    return f"✅ Branch '{branch}' atualizada com sucesso."
 
 
-def create_branch(repo_path: str, branch_name: str) -> None:
-    """Cria uma nova branch."""
+def create_branch(repo_path: str, branch_name: str) -> str:
+    """
+    Cria uma nova branch.
+    Retorna uma mensagem de sucesso.
+    """
     run_git_command(repo_path, ["checkout", "-b", branch_name])
+    return f"🌱 Branch '{branch_name}' criada com sucesso."
 
 
-def checkout_branch(repo_path: str, branch: str) -> None:
-    """Realiza o checkout para a branch especificada."""
+def checkout_branch(repo_path: str, branch: str) -> str:
+    """
+    Realiza o checkout para a branch especificada.
+    Retorna uma mensagem de sucesso.
+    """
     run_git_command(repo_path, ["checkout", branch])
+    return f"✅ Checkout realizado para '{branch}'."
 
 
 def list_local_branches(repo_path: str) -> List[str]:
