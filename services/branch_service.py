@@ -16,13 +16,26 @@ def list_remote_branches(repo_path: str) -> List[str]:
 
 
 def update_branch(repo_path: str, branch: str) -> str:
+    """Atualiza a branch local com a remota correspondente.
+    Se a branch ainda não existir no remoto, realiza o push inicial.
     """
-    Atualiza a branch local com a remota correspondente.
-    Retorna uma mensagem de sucesso.
-    """
-    run_git_command(repo_path, ["checkout", branch])
-    run_git_command(repo_path, ["pull", "origin", branch])
-    return f"✅ Branch '{branch}' atualizada com sucesso."
+    try:
+        # Faz checkout para a branch alvo
+        run_git_command(repo_path, ["checkout", branch])
+
+        # Verifica se branch existe no remoto
+        remotas = run_git_command(repo_path, ["branch", "-r"]).splitlines()
+        remote_exists = any(f"origin/{branch}" in r.strip() for r in remotas)
+
+        if remote_exists:
+            run_git_command(repo_path, ["pull", "origin", branch])
+            return f"✅ Branch '{branch}' atualizada com sucesso."
+        else:
+            run_git_command(repo_path, ["push", "-u", "origin", branch])
+            run_git_command(repo_path, ["pull", "origin", branch])
+            return f"✅ Branch '{branch}' atualizada com sucesso."
+    except Exception as e:
+        raise GitCommandError(f"Erro ao atualizar branch '{branch}': {e}")
 
 
 def create_branch(repo_path: str, branch_name: str) -> str:
@@ -59,4 +72,3 @@ def safe_checkout(repo_path, branch):
         )
     run_git_command(repo_path, ["checkout", branch])
     return f"Checkout realizado com sucesso para '{branch}'."
-
