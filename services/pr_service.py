@@ -11,7 +11,7 @@ def create_pr(repo_path: str, base: str, compare: str, title: str) -> str:
     """
     try:
         url = create_pull_request(repo_path, base, compare, title)
-        return f"✅ Pull Request criado com sucesso!\n{url}"
+        return f"\n{url}"
     except Exception as e:
         raise GitCommandError(f"Erro ao criar PR: {e}")
 
