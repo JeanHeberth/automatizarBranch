@@ -7,7 +7,7 @@ from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
-from core.git_operations import GitCommandError, get_current_branch
+from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
 
 
 class MainWindow(tk.Tk):
@@ -273,7 +273,8 @@ class MainWindow(tk.Tk):
         popup.configure(bg="#F9FAFB")
 
         ttk.Label(popup, text="Branch Base (destino do PR):").pack(pady=5)
-        base_var = tk.StringVar(value="main")
+        default_base = get_default_main_branch(self.repo_path)
+        base_var = tk.StringVar(value=default_base)
         base_combo = ttk.Combobox(popup, textvariable=base_var, values=branches, state="readonly", width=40)
         base_combo.pack()
 
@@ -305,9 +306,6 @@ class MainWindow(tk.Tk):
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
-
-
-
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
