@@ -2,7 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 # Importação de serviços desacoplados
-from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches
+from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches, \
+    safe_checkout
 from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
 from services.rollback_service import rollback_commit, rollback_changes
@@ -179,7 +180,7 @@ class MainWindow(tk.Tk):
 
     def _checkout_action(self, branch):
         try:
-            result = checkout_branch(self.repo_path, branch)
+            result = safe_checkout(self.repo_path, branch)
             messagebox.showinfo("Sucesso", result)
             self.log(result)
         except Exception as e:

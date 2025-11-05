@@ -47,3 +47,16 @@ def list_local_branches(repo_path: str) -> List[str]:
     """Retorna as branches locais existentes."""
     raw = run_git_command(repo_path, ["branch"]).splitlines()
     return [b.replace("*", "").strip() for b in raw if b.strip()]
+
+
+def safe_checkout(repo_path, branch):
+    """Verifica alterações locais antes de trocar de branch."""
+    status = run_git_command(repo_path, ["status", "--porcelain"])
+    if status.strip():
+        raise GitCommandError(
+            "Existem alterações locais não commitadas.\n"
+            "Por favor, faça commit, stash ou descarte antes de trocar de branch."
+        )
+    run_git_command(repo_path, ["checkout", branch])
+    return f"Checkout realizado com sucesso para '{branch}'."
+
