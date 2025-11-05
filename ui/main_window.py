@@ -304,6 +304,7 @@ class MainWindow(tk.Tk):
                 self.log(f"Erro ao criar PR: {e}")
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
+        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
 
 
