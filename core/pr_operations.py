@@ -1,36 +1,29 @@
-import requests
 from core.env_utils import require_github_token
 from utils.repo_utils import get_repo_info
-from core.git_operations import GitCommandError
+import requests
+from pathlib import Path
 
 
-def create_pull_request(repo_path: str, base_branch: str, title: str) -> str:
+def create_pull_request(repo_path: Path, base: str, compare: str, title: str) -> str:
     """
-    Cria um Pull Request no GitHub.
-    A branch "compare" é a atual (retirada via repo_utils).
+    Cria um Pull Request via API do GitHub.
+    base = branch de destino (ex: main)
+    compare = branch de origem (ex: feature/nova-funcao)
     """
     token = require_github_token()
-    if not token:
-        raise GitCommandError("❌ GITHUB_TOKEN não encontrado. Adicione no arquivo .env")
-
     info = get_repo_info(repo_path)
     url = f"https://api.github.com/repos/{info.full_name}/pulls"
 
-    payload = {
-        "title": title,
-        "head": info.current_branch,
-        "base": base_branch,
-        "body": f"Pull Request automatizado via Tkinter Git App."
-    }
-
+    data = {"title": title, "head": compare, "base": base}
     headers = {
         "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
+        "Accept": "application/vnd.github+json"
     }
 
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=data)
 
-    if response.status_code == 201:
-        return response.json().get("html_url", "✅ Pull Request criado com sucesso!")
+    if response.status_code in (200, 201):
+        pr_url = response.json().get("html_url", "")
+        return f"✅ Pull Request criado com sucesso!\n{pr_url}"
     else:
-        raise GitCommandError(f"❌ Erro ao criar PR: {response.text}")
+        raise Exception(f"Erro ao criar PR: {response.status_code} - {response.text}")

@@ -1,11 +1,11 @@
-import os
 from dotenv import load_dotenv
+import os
 
-load_dotenv()
 
-def require_github_token():
-    """Obtém token do GitHub do ambiente."""
+def require_github_token() -> str:
+    """Lê o token do GitHub a partir do .env."""
+    load_dotenv()
     token = os.getenv("GITHUB_TOKEN")
     if not token:
-        raise RuntimeError("Token do GitHub não encontrado. Defina GITHUB_TOKEN no .env.")
+        raise EnvironmentError("Token do GitHub não encontrado. Crie um arquivo .env com GITHUB_TOKEN=...")
     return token
