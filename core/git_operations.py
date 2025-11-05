@@ -71,3 +71,26 @@ def merge_pull_request(repo_path: Path, pr_number: int) -> str:
         raise GitCommandError(f"PR #{pr_number} já foi mesclado ou está fechado.")
     else:
         raise GitCommandError(f"Erro ao mesclar PR #{pr_number}: {response.text}")
+
+
+def get_default_main_branch(repo_path: Path) -> str:
+    """
+    Detecta automaticamente a branch principal (ex: main, master, develop, etc.).
+    Verifica a configuração remota e retorna o nome correto.
+    """
+    try:
+        # 1️⃣ tenta ler a branch padrão definida no remoto
+        result = run_git_command(repo_path, ["symbolic-ref", "refs/remotes/origin/HEAD"])
+        # Exemplo de saída: "refs/remotes/origin/main"
+        return result.split("/")[-1].strip()
+    except RuntimeError:
+        # 2️⃣ fallback — verifica quais branches existem e escolhe a mais provável
+        remotas = run_git_command(repo_path, ["branch", "-r"]).splitlines()
+        remotas = [b.strip().replace("origin/", "") for b in remotas if "origin/" in b]
+
+        for name in ["main", "master", "develop", "production"]:
+            if name in remotas:
+                return name
+
+        # 3️⃣ fallback final — retorna a primeira da lista
+        return remotas[0] if remotas else "main"
