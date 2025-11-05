@@ -7,7 +7,7 @@ from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
-from core.git_operations import GitCommandError
+from core.git_operations import GitCommandError, get_current_branch
 
 
 class MainWindow(tk.Tk):
@@ -257,26 +257,28 @@ class MainWindow(tk.Tk):
             messagebox.showerror("Erro", str(e))
             self.log(str(e))
 
+        # =====================================================
+        # CRIAR PULL REQUEST
+        # =====================================================
+
     def on_criar_pr(self):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
-        try:
-            branches = list_branches(self.repo_path)
-        except Exception as e:
-            return messagebox.showerror("Erro", str(e))
+
+        branches = list_branches(self.repo_path)
 
         popup = tk.Toplevel(self)
         popup.title("Criar Pull Request")
-        popup.geometry("420x260")
+        popup.geometry("420x280")
         popup.configure(bg="#F9FAFB")
 
-        ttk.Label(popup, text="Branch Base (para onde vai o PR):").pack(pady=5)
-        base_var = tk.StringVar(value=branches[0])
+        ttk.Label(popup, text="Branch Base (destino do PR):").pack(pady=5)
+        base_var = tk.StringVar(value="main")
         base_combo = ttk.Combobox(popup, textvariable=base_var, values=branches, state="readonly", width=40)
         base_combo.pack()
 
-        ttk.Label(popup, text="Branch Compare (de onde vem o PR):").pack(pady=5)
-        compare_var = tk.StringVar(value=branches[1] if len(branches) > 1 else "")
+        ttk.Label(popup, text="Branch Compare (origem):").pack(pady=5)
+        compare_var = tk.StringVar(value=get_current_branch(self.repo_path))
         compare_combo = ttk.Combobox(popup, textvariable=compare_var, values=branches, state="readonly", width=40)
         compare_combo.pack()
 
@@ -291,30 +293,29 @@ class MainWindow(tk.Tk):
         base_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
         compare_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
 
-        def criar_pr():
+        def criar_pr_action():
             try:
-                result = create_pr(self.repo_path, base_var.get(), title_var.get())
-                messagebox.showinfo("Sucesso", f"✅ {result}")
-                self.log(result)
+                msg = create_pr(self.repo_path, base_var.get(), compare_var.get(), title_var.get())
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
                 popup.destroy()
             except Exception as e:
                 messagebox.showerror("Erro", str(e))
-                self.log(str(e))
+                self.log(f"Erro ao criar PR: {e}")
 
-        ttk.Button(popup, text="Criar Pull Request", command=criar_pr).pack(pady=15)
+        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
+    # =====================================================
+    # MERGE PULL REQUEST
+    # =====================================================
     def on_merge_pr(self):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
-        try:
-            branches = list_remote_branches(self.repo_path)
-        except Exception as e:
-            return messagebox.showerror("Erro", str(e))
-
         popup = tk.Toplevel(self)
         popup.title("✅ Merge Pull Request")
         popup.geometry("420x220")
         popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
 
         ttk.Label(popup, text="Número do Pull Request (PR):").pack(pady=(20, 5))
         pr_var = tk.StringVar()
