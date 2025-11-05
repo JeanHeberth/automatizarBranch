@@ -305,6 +305,11 @@ class MainWindow(tk.Tk):
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
+
+
+
+        ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
+
     # =====================================================
     # MERGE PULL REQUEST
     # =====================================================
