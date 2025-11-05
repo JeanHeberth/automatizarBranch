@@ -2,8 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 # Importação de serviços desacoplados
-from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches, \
-    list_local_branches
+from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches
 from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
 from services.rollback_service import rollback_commit, rollback_changes
@@ -152,20 +151,22 @@ class MainWindow(tk.Tk):
     def on_atualizar_branch(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
         try:
             branches = list_branches(self.repo_path)
-            self._popup("Atualizar Branch", "Selecione uma branch:", self._atualizar_action, combo_values=branches)
         except Exception as e:
-            messagebox.showerror("Erro", str(e))
+            return messagebox.showerror("Erro", str(e))
 
-    def _atualizar_action(self, branch):
-        try:
-            result = update_branch(self.repo_path, branch)
-            messagebox.showinfo("Sucesso", result)
-            self.log(result)
-        except GitCommandError as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(str(e))
+        def atualizar(branch):
+            try:
+                msg = update_branch(self.repo_path, branch)
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+                self.log(f"Erro ao atualizar branch: {e}")
+
+        self._popup("Atualizar Branch", "Selecione uma branch:", atualizar, combo_values=branches)
 
     def on_checkout_branch(self):
         if not self.repo_path:
@@ -260,7 +261,7 @@ class MainWindow(tk.Tk):
         if not self.repo_path:
             return messagebox.showwarning("Repositório", "Selecione um repositório primeiro.")
         try:
-            branches = list_local_branches(self.repo_path)
+            branches = list_branches(self.repo_path)
         except Exception as e:
             return messagebox.showerror("Erro", str(e))
 
@@ -355,7 +356,7 @@ class MainWindow(tk.Tk):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
         try:
-            locals_ = list_local_branches(self.repo_path)
+            locals_ = list_branches(self.repo_path)
             self._popup("Deletar Branch Local", "Selecione uma branch:", self._del_local_action, combo_values=locals_)
         except Exception as e:
             messagebox.showerror("Erro", str(e))
