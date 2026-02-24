@@ -1,5 +1,5 @@
 from typing import List
-from core.git_operations import run_git_command, get_current_branch, GitCommandError
+from core.git_operations import run_git_command, GitCommandError
 from core.logger_config import get_logger
 from core.cache import cached
 
@@ -58,12 +58,6 @@ def update_branch(repo_path: str, branch: str) -> str:
         return msg
     except Exception as e:
         logger.error(f"Erro ao atualizar branch '{branch}': {e}")
-            return f"✅ Branch '{branch}' atualizada com sucesso."
-        else:
-            run_git_command(repo_path, ["push", "-u", "origin", branch])
-            run_git_command(repo_path, ["pull", "origin", branch])
-            return f"✅ Branch '{branch}' atualizada com sucesso."
-    except Exception as e:
         raise GitCommandError(f"Erro ao atualizar branch '{branch}': {e}")
 
 
@@ -130,11 +124,3 @@ def safe_checkout(repo_path, branch):
     except GitCommandError as e:
         logger.error(f"Erro em safe_checkout: {e}")
         raise
-    status = run_git_command(repo_path, ["status", "--porcelain"])
-    if status.strip():
-        raise GitCommandError(
-            "Existem alterações locais não commitadas.\n"
-            "Por favor, faça commit, stash ou descarte antes de trocar de branch."
-        )
-    run_git_command(repo_path, ["checkout", branch])
-    return f"Checkout realizado com sucesso para '{branch}'."
