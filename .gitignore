@@ -1,21 +1,50 @@
 # Arquivos de log
 *.log
+logs/
+log.txt
 
 # Ambiente virtual
 .venv/
+venv/
+
+# Variáveis de ambiente (IMPORTANTE: contém GITHUB_TOKEN)
 .env
+.env.local
+.env.*.local
+
 # PyCharm / IntelliJ / VSCode
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # Arquivos Python compilados
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+
+# GitHub Actions
 /.github/agents
 
 # Arquivos temporários de sistema
 .DS_Store
+Thumbs.db
+*.bak
+*.tmp
 
-####
-log.txt
+# IDE
+*.iml
+*.iws
+*.ipr
+

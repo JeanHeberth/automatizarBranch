@@ -9,16 +9,21 @@ from services.delete_service import delete_remote_branch, delete_local_branch, d
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
+from utils.worker_thread import run_in_thread
+from core.logger_config import setup_logging, get_ui_handler
 
 
 class MainWindow(tk.Tk):
     def __init__(self):
         super().__init__()
+        # Configurar logging
+        setup_logging()
         self.title("🚀 Automação Git com Tkinter")
         self.resizable(True, True)
         self.minsize(800, 850)
         self.configure(bg="#f7f8fa", padx=5, pady=5)
         self.repo_path = None
+        self.is_loading = False
         self._setup_theme()
         self._build_ui()
 
@@ -106,9 +111,39 @@ class MainWindow(tk.Tk):
         self.log_text.config(state="disabled")
         self.log_text.see("end")
 
+    def _run_async(self, func, args=(), on_success=None, on_error=None):
+        """Executa função em thread para não congelar UI."""
+        def on_success_wrapper(result):
+            self.is_loading = False
+            if on_success:
+                on_success(result)
+
+        def on_error_wrapper(error):
+            self.is_loading = False
+            if on_error:
+                on_error(error)
+
+        def on_finally():
+            # Atualizar UI após conclusão
+            self.update_idletasks()
+
+        self.is_loading = True
+        run_in_thread(
+            func,
+            args=args,
+            on_success=on_success_wrapper,
+            on_error=on_error_wrapper,
+            on_finally=on_finally
+        )
+
     def on_select_repo(self):
         repo = filedialog.askdirectory(title="Selecione o repositório Git")
         if repo:
+            # Validar se é um repositório Git
+            import os
+            if not os.path.isdir(os.path.join(repo, ".git")):
+                return messagebox.showerror("Erro", "Pasta selecionada não é um repositório Git válido.\nCertifique-se de que contém a pasta '.git'.")
+
             self.repo_path = repo
             self.repo_entry.config(state="normal")
             self.repo_entry.delete(0, "end")
@@ -140,7 +175,10 @@ class MainWindow(tk.Tk):
             widget.pack(pady=10)
 
         def confirmar():
-            value = var.get()
+            value = var.get().strip()
+            # Validação de entrada
+            if not value:
+                return messagebox.showwarning("Aviso", "Campo não pode estar vazio!")
             popup.destroy()
             callback(value)
 
@@ -159,13 +197,18 @@ class MainWindow(tk.Tk):
             return messagebox.showerror("Erro", str(e))
 
         def atualizar(branch):
-            try:
-                msg = update_branch(self.repo_path, branch)
+            def execute():
+                return update_branch(self.repo_path, branch)
+
+            def on_success(msg):
                 messagebox.showinfo("Sucesso", msg)
                 self.log(msg)
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao atualizar branch: {e}")
+
+            def on_error(error):
+                messagebox.showerror("Erro", str(error))
+                self.log(f"Erro ao atualizar branch: {error}")
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
 
         self._popup("Atualizar Branch", "Selecione uma branch:", atualizar, combo_values=branches)
 
@@ -221,13 +264,18 @@ class MainWindow(tk.Tk):
         self._popup("Commit + Push", "Mensagem do commit:", self._commit_push_action, entry=True)
 
     def _commit_push_action(self, msg):
-        try:
-            result = commit_and_push(self.repo_path, msg)
+        def execute():
+            return commit_and_push(self.repo_path, msg)
+
+        def on_success(result):
             messagebox.showinfo("Sucesso", result)
             self.log(result)
-        except GitCommandError as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(str(e))
+
+        def on_error(error):
+            messagebox.showerror("Erro", str(error))
+            self.log(str(error))
+
+        self._run_async(execute, on_success=on_success, on_error=on_error)
 
     def on_realizar_rollback(self):
         if not self.repo_path:
@@ -296,14 +344,19 @@ class MainWindow(tk.Tk):
         compare_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
 
         def criar_pr_action():
-            try:
-                msg = create_pr(self.repo_path, base_var.get(), compare_var.get(), title_var.get())
+            def execute():
+                return create_pr(self.repo_path, base_var.get(), compare_var.get(), title_var.get())
+
+            def on_success(msg):
                 messagebox.showinfo("Sucesso", msg)
                 self.log(msg)
                 popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro", str(e))
-                self.log(f"Erro ao criar PR: {e}")
+
+            def on_error(error):
+                messagebox.showerror("Erro", str(error))
+                self.log(f"Erro ao criar PR: {error}")
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
 
         ttk.Button(popup, text="Criar Pull Request", command=criar_pr_action).pack(pady=15)
 
@@ -327,14 +380,20 @@ class MainWindow(tk.Tk):
             pr_number = pr_var.get().strip()
             if not pr_number.isdigit():
                 return messagebox.showwarning("Aviso", "Informe um número de PR válido.")
-            try:
-                msg = merge_pr(self.repo_path, int(pr_number))
+
+            def execute():
+                return merge_pr(self.repo_path, int(pr_number))
+
+            def on_success(msg):
                 messagebox.showinfo("Merge PR", msg)
                 self.log(msg)
                 popup.destroy()
-            except Exception as e:
-                messagebox.showerror("Erro no Merge PR", str(e))
-                self.log(f"Erro ao mesclar PR: {e}")
+
+            def on_error(error):
+                messagebox.showerror("Erro no Merge PR", str(error))
+                self.log(f"Erro ao mesclar PR: {error}")
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
 
         button_frame = ttk.Frame(popup)
         button_frame.pack(pady=20)
