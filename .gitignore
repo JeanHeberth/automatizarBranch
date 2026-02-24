@@ -12,6 +12,7 @@
 __pycache__/
 *.pyc
 *.pyo
+/.github/agents
 
 # Arquivos temporários de sistema
 .DS_Store
