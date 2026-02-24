@@ -1,4 +1,4 @@
-from core.pr_operations import create_pull_request
+from services.pr_operations import create_pull_request
 from core.git_operations import merge_pull_request, GitCommandError
 
 
