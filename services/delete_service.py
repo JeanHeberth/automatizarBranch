@@ -42,3 +42,27 @@ def delete_remote_branch(repo_path: str, branch: str) -> str:
         return f"🗑️ Branch remota '{branch}' deletada com sucesso."
     except Exception as e:
         raise GitCommandError(f"Erro ao deletar branch remota '{branch}': {e}")
+
+
+def delete_all_remote_branches(repo_path: str) -> str:
+    """Deleta todas as branches remotas, exceto as protegidas."""
+    try:
+        raw = run_git_command(repo_path, ["branch", "-r"]).splitlines()
+        remotas = [b.strip().replace("origin/", "") for b in raw if "origin/" in b and "HEAD" not in b]
+        protegidas = {"main", "master", "develop"}
+        deletadas = []
+
+        for br in remotas:
+            if br not in protegidas:
+                try:
+                    run_git_command(repo_path, ["push", "origin", "--delete", br])
+                    deletadas.append(br)
+                except Exception as e:
+                    print(f"⚠️ Não foi possível deletar '{br}': {e}")
+
+        if deletadas:
+            return f"🧹 Branches remotas deletadas: {', '.join(deletadas)}"
+        else:
+            return "Nenhuma branch remota deletada (todas protegidas)."
+    except Exception as e:
+        raise GitCommandError(f"Erro ao deletar todas as branches remotas: {e}")

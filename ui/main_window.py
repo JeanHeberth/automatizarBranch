@@ -5,7 +5,7 @@ from tkinter import ttk, filedialog, messagebox
 from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches, \
     safe_checkout
 from services.commit_service import commit_changes, commit_and_push
-from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches
+from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches, delete_all_remote_branches
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
@@ -77,6 +77,7 @@ class MainWindow(tk.Tk):
             ("✅ Merge Pull Request", self.on_merge_pr),
             ("🧹 Deletar Todas Locais", self.on_deletar_todas_locais),
             ("🗑️ Deletar Branch Local", self.on_deletar_branch_local),
+            ("🧹 Deletar Todas Remotas", self.on_deletar_todas_remotas),
             ("🚮 Deletar Branch Remota", self.on_deletar_branch_remota),
             ("❌ Sair", self.destroy),
         ]
@@ -466,3 +467,24 @@ class MainWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Erro", str(e))
             self.log(str(e))
+
+    def on_deletar_todas_remotas(self):
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+        if not messagebox.askyesno("Confirmação", "Deseja deletar TODAS as branches remotas (exceto protegidas: main, master, develop)?"):
+            return
+
+        def execute():
+            return delete_all_remote_branches(self.repo_path)
+
+        def on_success(result):
+            messagebox.showinfo("Sucesso", result)
+            self.log(result)
+
+        def on_error(error):
+            messagebox.showerror("Erro", str(error))
+            self.log(str(error))
+
+        self._run_async(execute, on_success=on_success, on_error=on_error)
+
+
