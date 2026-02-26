@@ -11,6 +11,7 @@ venv/
 .env
 .env.local
 .env.*.local
+*.md
 
 # PyCharm / IntelliJ / VSCode
 .idea/
