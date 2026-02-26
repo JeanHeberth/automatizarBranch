@@ -20,13 +20,24 @@ class MainWindow(tk.Tk):
         # Configurar logging
         setup_logging()
         self.title("🚀 Automação Git com Tkinter")
-        self.resizable(True, True)
-        self.minsize(800, 850)
-        self.configure(bg="#f7f8fa", padx=5, pady=5)
+        self.configure(bg="#f7f8fa")
         self.repo_path = None
         self.is_loading = False
         self._setup_theme()
         self._build_ui()
+        # Tornar janela responsiva e maximizar ao abrir
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        # Definir tamanho mínimo adaptativo (ex: 14" notebook ~ 1366x768)
+        min_w = min(1000, int(screen_width * 0.95))
+        min_h = min(700, int(screen_height * 0.92))
+        self.minsize(min_w, min_h)
+        self.geometry(f"{min_w}x{min_h}")
+        self.resizable(True, True)
+        # Maximizar se tela for grande
+        if screen_width > 1400:
+            self.state('zoomed')
 
     # =====================================================
     # CONFIGURAÇÃO VISUAL
@@ -52,61 +63,86 @@ class MainWindow(tk.Tk):
     # INTERFACE PRINCIPAL
     # =====================================================
     def _build_ui(self):
-        ttk.Label(self, text="Automação de Branches 💡", font=("Segoe UI Semibold", 16)).pack(pady=(0, 2))
-        ttk.Label(self, text="Gerencie branches, commits e PRs de forma visual e simples.", font=("Segoe UI", 10)).pack(
-            pady=(0, 15))
+        # Frame principal centralizado
+        main_frame = ttk.Frame(self, padding=20)
+        main_frame.pack(fill="both", expand=True)
+        main_frame.grid_rowconfigure(2, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
 
-        ttk.Label(self, text="📁 Repositório Git:", font=("Segoe UI", 12, "bold")).pack(pady=(5, 0))
+        # Cabeçalho destacado
+        header = ttk.Label(main_frame, text="Automação de Branches 🚀", font=("Segoe UI Semibold", 22), anchor="center")
+        header.pack(pady=(0, 8))
+        subheader = ttk.Label(main_frame, text="Gerencie branches, commits, PRs e mais de forma visual e simples.", font=("Segoe UI", 12), anchor="center")
+        subheader.pack(pady=(0, 18))
 
-        self.repo_entry = ttk.Entry(self, width=50, state="readonly")
-        self.repo_entry.pack(pady=5)
+        # Área do repositório
+        repo_frame = ttk.Frame(main_frame)
+        repo_frame.pack(fill="x", pady=(0, 18))
+        ttk.Label(repo_frame, text="📁 Repositório Git:", font=("Segoe UI", 12, "bold")).pack(side="left")
+        self.repo_entry = ttk.Entry(repo_frame, width=50, state="readonly")
+        self.repo_entry.pack(side="left", padx=(8, 0), fill="x", expand=True)
+        ttk.Button(repo_frame, text="Selecionar Repositório", command=self.on_select_repo).pack(side="left", padx=(12, 0))
 
-        ttk.Button(self, text="Selecionar Repositório", width=50, command=self.on_select_repo).pack(pady=(5, 0))
+        # Frame de botões agrupados por categoria
+        button_area = ttk.Frame(main_frame)
+        button_area.pack(fill="x", pady=(0, 18))
 
-        button_frame = ttk.Frame(self)
-        button_frame.pack(pady=5)
+        def add_group(title, buttons, btn_width=22):
+            group = ttk.LabelFrame(button_area, text=title, padding=(12, 8))
+            group.pack(side="left", padx=10, fill="y", expand=True, anchor="n")
+            for text, cmd in buttons:
+                ttk.Button(group, text=text, width=btn_width, command=cmd).pack(pady=4, fill="x")
 
-        buttons = [
+        add_group("Branch", [
             ("🔄 Atualizar Branch", self.on_atualizar_branch),
-            ("↩️ Rollback de Alterações", self.on_realizar_rollback_de_alteracoes),
-            ("↩️ Rollback de Commit", self.on_realizar_rollback),
             ("🌿 Checkout de Branch", self.on_checkout_branch),
             ("🌱 Criar Branch", self.on_criar_branch),
+        ], btn_width=22)
+        add_group("Commit", [
             ("💬 Fazer Commit", self.on_commit),
             ("💾 Commit + Push", self.on_commit_push),
+            ("↩️ Rollback de Alterações", self.on_realizar_rollback_de_alteracoes),
+            ("↩️ Rollback de Commit", self.on_realizar_rollback),
+        ], btn_width=22)
+        add_group("Pull Request", [
             ("🔗 Criar Pull Request", self.on_criar_pr),
             ("✅ Merge Pull Request", self.on_merge_pr),
+        ], btn_width=22)
+        add_group("Stash", [
             ("💾 Salvar Stash", self.on_salvar_stash),
             ("📋 Ver Stashes", self.on_ver_stashes),
             ("♻️ Aplicar Stash", self.on_aplicar_stash),
             ("🗑️ Limpar Stashes", self.on_limpar_stashes),
-            ("🧹 Deletar Todas Locais", self.on_deletar_todas_locais),
-            ("🗑️ Deletar Branch Local", self.on_deletar_branch_local),
-            ("🧹 Deletar Todas Remotas", self.on_deletar_todas_remotas),
-            ("🚮 Deletar Branch Remota", self.on_deletar_branch_remota),
-            ("❌ Sair", self.destroy),
-        ]
+        ], btn_width=22)
+        add_group("Deleção", [
+            ("🧹 Deletar Todas as Branches Locais (exceto protegidas)", self.on_deletar_todas_locais),
+            ("🗑️ Deletar Branch Local Selecionada", self.on_deletar_branch_local),
+            ("🧹 Deletar Todas as Branches Remotas (exceto protegidas)", self.on_deletar_todas_remotas),
+            ("🚮 Deletar Branch Remota Selecionada", self.on_deletar_branch_remota),
+            ("❌ Sair do Sistema", self.destroy),
+        ], btn_width=60)
 
-        for text, cmd in buttons:
-            ttk.Button(button_frame, text=text, width=50, command=cmd).pack(pady=4, fill="x")
-
-        ttk.Label(self,
-                  text="🧾 Logs de Execução:",
-                  font=("Segoe UI", 12, "bold"),
-                  anchor="center",
-                  justify="center").pack(pady=(15, 5))
-
+        # Área de logs separada visualmente
+        logs_label = ttk.Label(main_frame, text="🧾 Logs de Execução:", font=("Segoe UI", 13, "bold"), anchor="w")
+        logs_label.pack(pady=(18, 4), anchor="w")
+        log_frame = ttk.Frame(main_frame)
+        log_frame.pack(fill="both", expand=True)
+        log_scrollbar = ttk.Scrollbar(log_frame, orient="vertical")
+        log_scrollbar.pack(side="right", fill="y")
         self.log_text = tk.Text(
-            self,
-            height=10,
-            width=80,
+            log_frame,
+            height=12,
+            width=100,
             state="disabled",
             bg="#F3F6FA",
             fg="#2E3440",
             relief="flat",
-            font=("Segoe UI", 12, "bold")
+            font=("Segoe UI", 12, "bold"),
+            yscrollcommand=log_scrollbar.set,
+            wrap="word"
         )
-        self.log_text.pack(pady=(0, 5))
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scrollbar.config(command=self.log_text.yview)
 
     # =====================================================
     # UTILITÁRIOS
@@ -739,5 +775,4 @@ class MainWindow(tk.Tk):
             self.log(str(error))
 
         self._run_async(execute, on_success=on_success, on_error=on_error)
-
 
