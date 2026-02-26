@@ -174,3 +174,40 @@ def safe_checkout(repo_path, branch):
     except GitCommandError as e:
         logger.error(f"Erro em safe_checkout: {e}")
         raise
+
+
+def validate_pr_ready(repo_path: str, base_branch: str, compare_branch: str) -> str:
+    """Valida se a branch compare está atualizada e sem conflito com a base."""
+    try:
+        logger.info(f"Validando PR: '{compare_branch}' -> '{base_branch}'...")
+
+        run_git_command(repo_path, ["fetch", "origin", base_branch])
+
+        try:
+            run_git_command(repo_path, ["merge-base", "--is-ancestor", f"origin/{base_branch}", compare_branch])
+        except GitCommandError:
+            msg = (
+                f"⚠️ A branch '{compare_branch}' está desatualizada em relação a '{base_branch}'.\n"
+                "Atualize sua branch (rebase/merge) e faça push antes de criar o PR."
+            )
+            logger.warning(msg)
+            raise GitCommandError(msg)
+
+        base_commit = run_git_command(repo_path, ["merge-base", compare_branch, f"origin/{base_branch}"])
+        merge_output = run_git_command(repo_path, ["merge-tree", base_commit, compare_branch, f"origin/{base_branch}"])
+        if "<<<<<<<" in merge_output or ">>>>>>>" in merge_output:
+            msg = (
+                f"⚠️ Conflito detectado ao mesclar '{compare_branch}' em '{base_branch}'.\n"
+                "Resolva os conflitos localmente e faça push antes de criar o PR."
+            )
+            logger.warning(msg)
+            raise GitCommandError(msg)
+
+        msg = "✅ Branch pronta para criar PR."
+        logger.info(msg)
+        return msg
+    except GitCommandError:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao validar PR: {e}")
+        raise GitCommandError(f"Erro ao validar PR: {e}")

@@ -1,4 +1,5 @@
 from services.pr_operations import create_pull_request
+from services.branch_service import validate_pr_ready
 from core.git_operations import merge_pull_request, GitCommandError
 
 
@@ -10,6 +11,7 @@ def create_pr(repo_path: str, base: str, compare: str, title: str) -> str:
     title: título do PR
     """
     try:
+        validate_pr_ready(repo_path, base, compare)
         url = create_pull_request(repo_path, base, compare, title)
         return f"\n{url}"
     except Exception as e:
