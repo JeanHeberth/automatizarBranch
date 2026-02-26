@@ -58,7 +58,7 @@ class TestBranchService(unittest.TestCase):
 
         result = create_branch(self.test_repo_path, "feature/test")
         self.assertIn("feature/test", result)
-        self.assertIn("✅", result)
+        self.assertIn("🌱", result)
 
     @patch('services.branch_service.run_git_command')
     def test_checkout_branch(self, mock_run_git):
