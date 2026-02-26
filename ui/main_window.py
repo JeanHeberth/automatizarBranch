@@ -39,6 +39,11 @@ class MainWindow(tk.Tk):
         if screen_width > 1400:
             self.state('zoomed')
 
+        # Botão de tema no canto superior direito
+        theme_btn = ttk.Button(self, text="🌗", width=3, command=self._show_theme_menu)
+        theme_btn.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=10)
+        self._current_theme = "system"
+
     # =====================================================
     # CONFIGURAÇÃO VISUAL
     # =====================================================
@@ -776,3 +781,66 @@ class MainWindow(tk.Tk):
 
         self._run_async(execute, on_success=on_success, on_error=on_error)
 
+    def _show_theme_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Claro", command=lambda: self._set_theme("light"))
+        menu.add_command(label="Escuro", command=lambda: self._set_theme("dark"))
+        menu.add_command(label="Sistema", command=lambda: self._set_theme("system"))
+        menu.tk_popup(self.winfo_pointerx(), self.winfo_pointery())
+
+    def _set_theme(self, theme):
+        self._current_theme = theme
+        style = ttk.Style()
+        if theme == "dark":
+            style.theme_use("clam")
+            # Fundo principal e frames
+            style.configure("TFrame", background="#181A20")
+            style.configure("TLabel", background="#181A20", foreground="#FFFFFF")
+            style.configure("TLabelFrame", background="#181A20", foreground="#FFFFFF")
+            # Botões
+            style.configure("TButton", background="#23272e", foreground="#FFFFFF", borderwidth=1, focusthickness=3, padding=6)
+            style.map("TButton",
+                background=[("active", "#31343b")],
+                foreground=[("active", "#FFFFFF")]
+            )
+            # Entradas
+            style.configure("TEntry", fieldbackground="#23272e", foreground="#FFFFFF", bordercolor="#31343b")
+            # Área de logs
+            if hasattr(self, 'log_text'):
+                self.log_text.config(bg="#23272e", fg="#FFFFFF", insertbackground="#FFFFFF")
+            self.configure(bg="#181A20")
+        elif theme == "light":
+            style.theme_use("clam")
+            style.configure("TFrame", background="#F9FAFB")
+            style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
+            style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
+            style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+            style.map("TButton", background=[("active", "#C7D8EE")])
+            style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
+            if hasattr(self, 'log_text'):
+                self.log_text.config(bg="#F3F6FA", fg="#2E3440", insertbackground="#2E3440")
+            self.configure(bg="#F9FAFB")
+        else:  # sistema
+            import platform
+            if platform.system() == "Darwin":
+                style.theme_use("clam")
+                style.configure("TFrame", background="#F9FAFB")
+                style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
+                style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
+                style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+                style.map("TButton", background=[("active", "#C7D8EE")])
+                style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
+                if hasattr(self, 'log_text'):
+                    self.log_text.config(bg="#F3F6FA", fg="#2E3440", insertbackground="#2E3440")
+                self.configure(bg="#F9FAFB")
+            else:
+                style.theme_use("clam")
+                style.configure("TFrame", background="#F9FAFB")
+                style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
+                style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
+                style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+                style.map("TButton", background=[("active", "#C7D8EE")])
+                style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
+                if hasattr(self, 'log_text'):
+                    self.log_text.config(bg="#F3F6FA", fg="#2E3440", insertbackground="#2E3440")
+                self.configure(bg="#F9FAFB")
