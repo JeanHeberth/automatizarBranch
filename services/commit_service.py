@@ -19,13 +19,25 @@ def commit_changes(repo_path: str, message: str) -> str:
 
 
 def commit_and_push(repo_path: str, message: str) -> str:
-    """Realiza commit e push."""
+    """Realiza commit e push.
+
+    Nota: Se a branch foi feita rebase recentemente, usa --force-with-lease
+    para push seguro.
+    """
     try:
         logger.info(f"Realizando commit + push com mensagem: '{message}'...")
         branch = get_current_branch(repo_path)
         run_git_command(repo_path, ["add", "."])
         run_git_command(repo_path, ["commit", "-m", message])
-        run_git_command(repo_path, ["push", "-u", "origin", branch])
+
+        # Tentar push normal primeiro
+        try:
+            run_git_command(repo_path, ["push", "origin", branch])
+        except GitCommandError:
+            # Se falhar, tentar com force-with-lease (seguro após rebase)
+            logger.info("Push falhou. Tentando com --force-with-lease...")
+            run_git_command(repo_path, ["push", "origin", branch, "--force-with-lease"])
+
         msg = f"Commit e push enviados para 'origin/{branch}'."
         logger.info(msg)
         return msg
