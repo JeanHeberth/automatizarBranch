@@ -158,13 +158,17 @@ def safe_checkout(repo_path, branch):
         status = run_git_command(repo_path, ["status", "--porcelain"])
         if status.strip():
             msg = (
-                "Existem alterações locais não commitadas.\n"
-                "Por favor, faça commit, stash ou descarte antes de trocar de branch."
+                "⚠️ Existem alterações locais não commitadas.\n\n"
+                "Você pode:\n"
+                "1. 💾 Salvar em Stash (recomendado)\n"
+                "2. 💬 Fazer Commit\n"
+                "3. ↩️ Descartar alterações\n\n"
+                "Use a função 'Stash' para salvar seu trabalho temporariamente."
             )
             logger.warning(msg)
             raise GitCommandError(msg)
         run_git_command(repo_path, ["checkout", branch])
-        msg = f"Checkout realizado com sucesso para '{branch}'."
+        msg = f"✅ Checkout realizado com sucesso para '{branch}'."
         logger.info(msg)
         return msg
     except GitCommandError as e:

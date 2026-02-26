@@ -8,6 +8,7 @@ from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches, delete_all_remote_branches
 from services.rollback_service import rollback_commit, rollback_changes
 from services.pr_service import create_pr, merge_pr
+from services.stash_service import stash_save, stash_list, stash_apply, stash_pop, stash_drop, stash_clear
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
 from utils.worker_thread import run_in_thread
 from core.logger_config import setup_logging, get_ui_handler
@@ -75,6 +76,10 @@ class MainWindow(tk.Tk):
             ("💾 Commit + Push", self.on_commit_push),
             ("🔗 Criar Pull Request", self.on_criar_pr),
             ("✅ Merge Pull Request", self.on_merge_pr),
+            ("💾 Salvar Stash", self.on_salvar_stash),
+            ("📋 Ver Stashes", self.on_ver_stashes),
+            ("♻️ Aplicar Stash", self.on_aplicar_stash),
+            ("🗑️ Limpar Stashes", self.on_limpar_stashes),
             ("🧹 Deletar Todas Locais", self.on_deletar_todas_locais),
             ("🗑️ Deletar Branch Local", self.on_deletar_branch_local),
             ("🧹 Deletar Todas Remotas", self.on_deletar_todas_remotas),
@@ -476,6 +481,254 @@ class MainWindow(tk.Tk):
 
         def execute():
             return delete_all_remote_branches(self.repo_path)
+
+        def on_success(result):
+            messagebox.showinfo("Sucesso", result)
+            self.log(result)
+
+        def on_error(error):
+            messagebox.showerror("Erro", str(error))
+            self.log(str(error))
+
+        self._run_async(execute, on_success=on_success, on_error=on_error)
+
+    # =====================================================
+    # OPERAÇÕES DE STASH
+    # =====================================================
+    def on_salvar_stash(self):
+        """Salva as alterações atuais em um stash."""
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        popup = tk.Toplevel(self)
+        popup.title("💾 Salvar Stash")
+        popup.geometry("420x180")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text="Mensagem do Stash (opcional):").pack(pady=(20, 5))
+        msg_var = tk.StringVar()
+        ttk.Entry(popup, textvariable=msg_var, width=40).pack(pady=(0, 10))
+
+        def confirmar():
+            message = msg_var.get().strip()
+            popup.destroy()
+
+            def execute():
+                return stash_save(self.repo_path, message if message else None)
+
+            def on_success(result):
+                messagebox.showinfo("Stash Salvo", result)
+                self.log(result)
+
+            def on_error(error):
+                messagebox.showerror("Erro", str(error))
+                self.log(str(error))
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        button_frame = ttk.Frame(popup)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="Salvar", command=confirmar, width=15).grid(row=0, column=0, padx=5)
+        ttk.Button(button_frame, text="Cancelar", command=popup.destroy, width=15).grid(row=0, column=1, padx=5)
+
+    def on_ver_stashes(self):
+        """Lista todos os stashes salvos."""
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        try:
+            stashes = stash_list(self.repo_path)
+
+            if not stashes:
+                messagebox.showinfo("Stashes", "📋 Nenhum stash encontrado.")
+                self.log("Nenhum stash encontrado.")
+                return
+
+            # Criar popup com lista de stashes
+            popup = tk.Toplevel(self)
+            popup.title("📋 Lista de Stashes")
+            popup.geometry("600x400")
+            popup.configure(bg="#F9FAFB")
+
+            ttk.Label(popup, text="Stashes Salvos:", font=("Segoe UI", 12, "bold")).pack(pady=10)
+
+            # Frame com scrollbar
+            frame = ttk.Frame(popup)
+            frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+            scrollbar = ttk.Scrollbar(frame)
+            scrollbar.pack(side="right", fill="y")
+
+            listbox = tk.Listbox(
+                frame,
+                yscrollcommand=scrollbar.set,
+                font=("Courier", 10),
+                bg="#FFFFFF",
+                selectmode="single"
+            )
+            listbox.pack(side="left", fill="both", expand=True)
+            scrollbar.config(command=listbox.yview)
+
+            for stash in stashes:
+                listbox.insert("end", stash)
+
+            button_frame = ttk.Frame(popup)
+            button_frame.pack(pady=10)
+
+            def aplicar_selecionado():
+                selection = listbox.curselection()
+                if not selection:
+                    return messagebox.showwarning("Aviso", "Selecione um stash primeiro.")
+
+                stash_text = listbox.get(selection[0])
+                stash_ref = stash_text.split(":")[0]
+
+                def execute():
+                    return stash_apply(self.repo_path, stash_ref)
+
+                def on_success(result):
+                    messagebox.showinfo("Sucesso", result)
+                    self.log(result)
+                    popup.destroy()
+
+                def on_error(error):
+                    messagebox.showerror("Erro", str(error))
+                    self.log(str(error))
+
+                self._run_async(execute, on_success=on_success, on_error=on_error)
+
+            def pop_selecionado():
+                selection = listbox.curselection()
+                if not selection:
+                    return messagebox.showwarning("Aviso", "Selecione um stash primeiro.")
+
+                stash_text = listbox.get(selection[0])
+                stash_ref = stash_text.split(":")[0]
+
+                def execute():
+                    return stash_pop(self.repo_path, stash_ref)
+
+                def on_success(result):
+                    messagebox.showinfo("Sucesso", result)
+                    self.log(result)
+                    popup.destroy()
+
+                def on_error(error):
+                    messagebox.showerror("Erro", str(error))
+                    self.log(str(error))
+
+                self._run_async(execute, on_success=on_success, on_error=on_error)
+
+            def deletar_selecionado():
+                selection = listbox.curselection()
+                if not selection:
+                    return messagebox.showwarning("Aviso", "Selecione um stash primeiro.")
+
+                stash_text = listbox.get(selection[0])
+                stash_ref = stash_text.split(":")[0]
+
+                if not messagebox.askyesno("Confirmar", f"Deseja deletar o stash '{stash_ref}'?"):
+                    return
+
+                def execute():
+                    return stash_drop(self.repo_path, stash_ref)
+
+                def on_success(result):
+                    messagebox.showinfo("Sucesso", result)
+                    self.log(result)
+                    popup.destroy()
+
+                def on_error(error):
+                    messagebox.showerror("Erro", str(error))
+                    self.log(str(error))
+
+                self._run_async(execute, on_success=on_success, on_error=on_error)
+
+            ttk.Button(button_frame, text="♻️ Aplicar (manter)", command=aplicar_selecionado, width=20).grid(row=0, column=0, padx=5)
+            ttk.Button(button_frame, text="✅ Aplicar + Deletar", command=pop_selecionado, width=20).grid(row=0, column=1, padx=5)
+            ttk.Button(button_frame, text="🗑️ Deletar", command=deletar_selecionado, width=20).grid(row=0, column=2, padx=5)
+            ttk.Button(button_frame, text="Fechar", command=popup.destroy, width=20).grid(row=1, column=1, pady=10)
+
+            self.log(f"Encontrados {len(stashes)} stash(es).")
+
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
+            self.log(str(e))
+
+    def on_aplicar_stash(self):
+        """Aplica o stash mais recente."""
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        try:
+            stashes = stash_list(self.repo_path)
+            if not stashes:
+                messagebox.showinfo("Stash", "📋 Nenhum stash para aplicar.")
+                self.log("Nenhum stash encontrado.")
+                return
+        except Exception as e:
+            messagebox.showerror("Erro", str(e))
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("♻️ Aplicar Stash")
+        popup.geometry("420x160")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text="Escolha a operação:", font=("Segoe UI", 11, "bold")).pack(pady=(20, 10))
+
+        button_frame = ttk.Frame(popup)
+        button_frame.pack(pady=10)
+
+        def aplicar_manter():
+            popup.destroy()
+
+            def execute():
+                return stash_apply(self.repo_path)
+
+            def on_success(result):
+                messagebox.showinfo("Sucesso", result)
+                self.log(result)
+
+            def on_error(error):
+                messagebox.showerror("Erro", str(error))
+                self.log(str(error))
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        def aplicar_deletar():
+            popup.destroy()
+
+            def execute():
+                return stash_pop(self.repo_path)
+
+            def on_success(result):
+                messagebox.showinfo("Sucesso", result)
+                self.log(result)
+
+            def on_error(error):
+                messagebox.showerror("Erro", str(error))
+                self.log(str(error))
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        ttk.Button(button_frame, text="♻️ Aplicar (manter stash)", command=aplicar_manter, width=25).pack(pady=5)
+        ttk.Button(button_frame, text="✅ Aplicar + Deletar stash", command=aplicar_deletar, width=25).pack(pady=5)
+        ttk.Button(button_frame, text="Cancelar", command=popup.destroy, width=25).pack(pady=5)
+
+    def on_limpar_stashes(self):
+        """Limpa todos os stashes."""
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        if not messagebox.askyesno("Confirmação", "⚠️ Deseja deletar TODOS os stashes?\nEsta ação não pode ser desfeita!"):
+            return
+
+        def execute():
+            return stash_clear(self.repo_path)
 
         def on_success(result):
             messagebox.showinfo("Sucesso", result)
