@@ -37,6 +37,7 @@ lib64/
 
 # GitHub Actions
 /.github/agents
+*.md
 
 # Arquivos temporários de sistema
 .DS_Store
