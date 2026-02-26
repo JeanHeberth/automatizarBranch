@@ -781,6 +781,7 @@ class MainWindow(tk.Tk):
 
         self._run_async(execute, on_success=on_success, on_error=on_error)
 
+
     def _show_theme_menu(self):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Claro", command=lambda: self._set_theme("light"))
