@@ -6,6 +6,7 @@ from utils.settings import get_protected_branches as _get_protected_branches, ge
 import json
 import shutil
 import tempfile
+import subprocess
 
 logger = get_logger()
 
@@ -330,8 +331,20 @@ def resolve_conflict(repo_path: str, branch: str, base_branch: str = None, favor
     try:
         if preview:
             temp_dir = tempfile.mkdtemp(prefix="automatizar_preview_")
-            # Copy repository to temp (including .git) to simulate changes locally without affecting original
-            shutil.copytree(repo_path, temp_dir, dirs_exist_ok=True)
+            # Try a shallow clone first for performance
+            try:
+                proc = subprocess.run(["git", "clone", "--depth", "1", repo_path, temp_dir], capture_output=True, text=True)
+                if proc.returncode != 0:
+                    # Fallback to full clone if shallow clone fails (some git servers or local repos may not support it)
+                    proc2 = subprocess.run(["git", "clone", repo_path, temp_dir], capture_output=True, text=True)
+                    if proc2.returncode != 0:
+                        raise GitCommandError(f"Falha ao clonar repositório para preview: {proc2.stderr.strip()}")
+            except Exception as e:
+                # As a last resort, fallback to filesystem copy (slower)
+                try:
+                    shutil.copytree(repo_path, temp_dir, dirs_exist_ok=True)
+                except Exception as e2:
+                    raise GitCommandError(f"Falha ao preparar preview: {e} / {e2}")
             work_dir = temp_dir
 
         # Garantir checkout na branch dentro work_dir
