@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from services.branch_service import update_branch, resolve_conflict
 from services.branch_service import create_branch
 from core.git_operations import GitCommandError
@@ -85,7 +85,7 @@ class TestRegressions(unittest.TestCase):
     @patch('services.branch_service._get_default_base_branch')
     @patch('services.branch_service.run_git_command')
     def test_create_branch_from_main_fetches_main_and_develop_and_checks_out(self, mock_run, mock_get_base):
-        """Garante que ao criar branch, buscamos origin/main, origin/develop, fazemos checkout na base e criamos feature/..."""
+        """Garante que ao criar branch, prefere origin/main quando presente, faz fetch e cria feature/..."""
         mock_get_base.return_value = 'main'
 
         calls = []
@@ -111,7 +111,7 @@ class TestRegressions(unittest.TestCase):
     @patch('services.branch_service._get_default_base_branch')
     @patch('services.branch_service.run_git_command')
     def test_create_branch_from_develop_does_not_double_fetch(self, mock_run, mock_get_base):
-        """Se a base for develop, apenas fetch de develop deve ser chamado (não deve tentar fetch develop extra)."""
+        """Se a base for develop, apenas fetch de develop deve ser chamado e criar branch a partir dela."""
         mock_get_base.return_value = 'develop'
 
         calls = []
@@ -134,4 +134,3 @@ class TestRegressions(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
