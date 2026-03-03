@@ -12,6 +12,7 @@ from services.stash_service import stash_save, stash_list, stash_apply, stash_po
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
 from utils.worker_thread import run_in_thread
 from core.logger_config import setup_logging
+from utils.settings import get_theme, set_theme
 
 
 class MainWindow(tk.Tk):
@@ -25,6 +26,10 @@ class MainWindow(tk.Tk):
         self.is_loading = False
         self._setup_theme()
         self._build_ui()
+        # Carregar tema salvo nas configurações do usuário
+        saved_theme = get_theme()
+        if saved_theme:
+            self._set_theme(saved_theme)
         # Tornar janela responsiva e maximizar ao abrir
         self.update_idletasks()
         screen_width = self.winfo_screenwidth()
