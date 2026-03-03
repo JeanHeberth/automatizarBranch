@@ -187,7 +187,7 @@ def _get_default_base_branch(repo_path: str) -> str:
         return "main"
 
 
-def create_branch(repo_path: str, branch_name: str) -> str:
+def create_branch(repo_path: str, branch_name: str, base_branch: str | None = None) -> str:
     """
     Cria uma nova branch com prefixo 'feature/'.
     Retorna uma mensagem de sucesso.
@@ -197,8 +197,27 @@ def create_branch(repo_path: str, branch_name: str) -> str:
         if not branch_name.startswith("feature/"):
             branch_name = f"feature/{branch_name}"
 
-        # Detectar branch base padrão e garantir que está atualizada
-        base_branch = _get_default_base_branch(repo_path)
+        # Atualizar remotos primeiro para garantir que list_remote_branches retorne dados recentes
+        try:
+            run_git_command(repo_path, ["fetch", "origin"])
+        except GitCommandError:
+            logger.debug("Falha ao executar 'git fetch origin' antes de criar branch; prosseguindo com detecção local/remota existente.")
+
+        # Se o usuário passou explicitamente a base, utilize-a; senão prefira main/master
+        if not base_branch:
+            try:
+                remotas = list_remote_branches(repo_path)
+            except Exception:
+                remotas = []
+
+            if "main" in remotas:
+                base_branch = "main"
+            elif "master" in remotas:
+                base_branch = "master"
+            else:
+                # fallback ao detector existente
+                base_branch = _get_default_base_branch(repo_path)
+
         # Buscar remotas para base e para develop (manter ambos atualizados)
         try:
             run_git_command(repo_path, ["fetch", "origin", base_branch])
@@ -215,7 +234,15 @@ def create_branch(repo_path: str, branch_name: str) -> str:
                 logger.debug("Não foi possível fetch origin/develop (pode não existir), prosseguindo.")
 
         # Fazer checkout para a branch base antes de criar a nova branch
-        run_git_command(repo_path, ["checkout", base_branch])
+        try:
+            run_git_command(repo_path, ["checkout", base_branch])
+        except GitCommandError:
+            # Se a branch local não existir, tentar criar local a partir do remoto (tracking)
+            try:
+                run_git_command(repo_path, ["checkout", "-b", base_branch, f"origin/{base_branch}"])
+            except GitCommandError as e:
+                logger.error(f"Falha ao criar/checkoutr base '{base_branch}': {e}")
+                raise
 
         # Criar a nova branch a partir da base atualizada
         run_git_command(repo_path, ["checkout", "-b", branch_name])
