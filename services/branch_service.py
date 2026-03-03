@@ -33,21 +33,30 @@ def list_remote_branches(repo_path: str) -> List[str]:
         raise
 
 
-def update_branch(repo_path: str, branch: str, base_branch: str = None) -> str:
-    """Atualiza a branch local com a remota e sincroniza com a branch base.
+def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy: str = "rebase") -> str:
+    """Atualiza a branch local sincronizando com a branch base.
 
-    Evita conflitos em PR/MR ao fazer rebase com a branch base (develop/main).
+    Fluxo:
+    - Faz checkout para `branch`.
+    - Faz fetch de `origin/<base_branch>` e `origin/<branch>`.
+    - Aplica sincronização conforme `strategy`:
+        - "rebase" (padrão): rebase local sobre `origin/<base_branch>` e push com --force-with-lease
+        - "merge": merge de `origin/<base_branch>` (preserva merges) e push normal
 
     Args:
-        repo_path: Caminho do repositório
-        branch: Nome da branch a atualizar
-        base_branch: Branch base para sincronização (padrão: develop ou main)
+        repo_path: caminho do repositório
+        branch: branch local a atualizar
+        base_branch: branch base (se None, detecta develop/main/master)
+        strategy: "rebase" ou "merge"
 
     Returns:
-        Mensagem de sucesso
+        Mensagem de sucesso.
+
+    Raises:
+        GitCommandError: em casos de erros git ou conflitos que precisem de ação manual.
     """
     try:
-        logger.info(f"Atualizando branch '{branch}'...")
+        logger.info(f"Atualizando branch '{branch}' com estratégia '{strategy}'...")
 
         # Faz checkout para a branch alvo
         run_git_command(repo_path, ["checkout", branch])
@@ -61,29 +70,68 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None) -> str:
         if status.strip():
             msg = (
                 f"⚠️ Existem alterações locais em '{branch}'.\n"
-                "Commit ou descarte antes de atualizar."
+                "Faça commit ou descarte antes de atualizar."
             )
             logger.warning(msg)
             raise GitCommandError(msg)
 
-        # Verifica se branch existe no remoto
-        remotas = run_git_command(repo_path, ["branch", "-r"]).splitlines()
-        remote_exists = any(f"origin/{branch}" in r.strip() for r in remotas)
+        # Busca informações remotas mais recentes (base e a própria branch)
+        logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
+        run_git_command(repo_path, ["fetch", "origin", base_branch])
+        run_git_command(repo_path, ["fetch", "origin", branch])
 
-        if remote_exists:
-            # Branch já existe no remoto: fazer fetch e rebase
-            logger.info(f"Sincronizando com 'origin/{base_branch}'...")
-            run_git_command(repo_path, ["fetch", "origin", base_branch])
-            run_git_command(repo_path, ["rebase", f"origin/{base_branch}"])
+        # Verifica se branch existe no remoto usando helper
+        remotas = list_remote_branches(repo_path)
+        remote_exists = branch in remotas
 
-            # Force push seguro após rebase
-            run_git_command(repo_path, ["push", "origin", branch, "--force-with-lease"])
-            msg = f"✅ Branch '{branch}' sincronizada com '{base_branch}'."
-        else:
-            # Branch é nova: fazer push inicial com tracking
-            logger.info(f"Criando tracking para 'origin/{branch}'...")
+        if not remote_exists:
+            # Branch é nova: push inicial com tracking
+            logger.info(f"Branch '{branch}' não existe no remoto. Fazendo push inicial com tracking...")
             run_git_command(repo_path, ["push", "-u", "origin", branch])
             msg = f"✅ Branch '{branch}' criada e enviada ao remoto."
+            logger.info(msg)
+            return msg
+
+        # Caso exista, sincroniza com a base
+        if strategy not in {"rebase", "merge"}:
+            raise GitCommandError(f"Strategy inválida: {strategy}. Use 'rebase' ou 'merge'.")
+
+        if strategy == "rebase":
+            logger.info(f"Rebaseando '{branch}' sobre origin/{base_branch}...")
+            try:
+                run_git_command(repo_path, ["rebase", f"origin/{base_branch}"])
+            except GitCommandError as e:
+                # Tentativa de abortar rebase para deixar repositório em estado limpo
+                try:
+                    run_git_command(repo_path, ["rebase", "--abort"])
+                except Exception:
+                    logger.debug("Falha ao abortar rebase automaticamente.")
+                msg = (
+                    f"⚠️ Conflito durante rebase: {e}.\n"
+                    "Resolva os conflitos localmente (git status) e finalize o rebase antes de tentar novamente."
+                )
+                logger.warning(msg)
+                raise GitCommandError(msg)
+
+            # Force push seguro após rebase (preserva trabalho remoto se houver divergência)
+            run_git_command(repo_path, ["push", "origin", branch, "--force-with-lease"])
+            msg = f"✅ Branch '{branch}' sincronizada com '{base_branch}' via rebase."
+
+        else:  # merge
+            logger.info(f"Mesclando origin/{base_branch} em '{branch}'...")
+            try:
+                run_git_command(repo_path, ["merge", f"origin/{base_branch}"])
+            except GitCommandError as e:
+                msg = (
+                    f"⚠️ Conflito durante merge: {e}.\n"
+                    "Resolva os conflitos localmente e faça commit antes de tentar novamente."
+                )
+                logger.warning(msg)
+                raise GitCommandError(msg)
+
+            # Push normal (merge preserva histórico)
+            run_git_command(repo_path, ["push", "origin", branch])
+            msg = f"✅ Branch '{branch}' sincronizada com '{base_branch}' via merge."
 
         logger.info(msg)
         return msg
@@ -116,17 +164,20 @@ def _get_default_base_branch(repo_path: str) -> str:
 
 def create_branch(repo_path: str, branch_name: str) -> str:
     """
-    Cria uma nova branch.
+    Cria uma nova branch com prefixo 'feature/'.
     Retorna uma mensagem de sucesso.
     """
     try:
-        logger.info(f"Criando branch '{branch_name}'...")
+        # Garante prefixo 'feature/'
+        if not branch_name.startswith("feature/"):
+            branch_name = f"feature/{branch_name}"
         run_git_command(repo_path, ["checkout", "-b", branch_name])
+        # Mantém o emoji 🌱 para compatibilidade com testes/UX
         msg = f"🌱 Branch '{branch_name}' criada com sucesso."
         logger.info(msg)
         return msg
     except GitCommandError as e:
-        logger.error(f"Erro ao criar branch '{branch_name}': {e}")
+        logger.error(f"Erro ao criar branch: {e}")
         raise
 
 
@@ -211,3 +262,31 @@ def validate_pr_ready(repo_path: str, base_branch: str, compare_branch: str) -> 
     except Exception as e:
         logger.error(f"Erro ao validar PR: {e}")
         raise GitCommandError(f"Erro ao validar PR: {e}")
+
+
+def get_protected_branches() -> List[str]:
+    """Retorna lista de branches protegidas (não podem ser deletadas)."""
+    return ["main", "master", "develop"]
+
+
+def delete_all_remote_branches(repo_path: str) -> List[str]:
+    """
+    Deleta todas as branches remotas não protegidas.
+    Retorna lista de branches deletadas.
+    """
+    try:
+        protected = set(get_protected_branches())
+        remotas = list_remote_branches(repo_path)
+        deletadas = []
+        for branch in remotas:
+            if branch not in protected:
+                try:
+                    run_git_command(repo_path, ["push", "origin", f":{branch}"])
+                    deletadas.append(branch)
+                    logger.info(f"Branch remota '{branch}' deletada.")
+                except GitCommandError as e:
+                    logger.warning(f"Erro ao deletar branch remota '{branch}': {e}")
+        return deletadas
+    except Exception as e:
+        logger.error(f"Erro ao deletar branches remotas: {e}")
+        raise GitCommandError(f"Erro ao deletar branches remotas: {e}")

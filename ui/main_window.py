@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 # Importação de serviços desacoplados
-from services.branch_service import list_branches, update_branch, create_branch, checkout_branch, list_remote_branches, \
+from services.branch_service import list_branches, update_branch, create_branch, list_remote_branches, \
     safe_checkout
 from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches, delete_all_remote_branches
@@ -11,7 +11,7 @@ from services.pr_service import create_pr, merge_pr
 from services.stash_service import stash_save, stash_list, stash_apply, stash_pop, stash_drop, stash_clear
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
 from utils.worker_thread import run_in_thread
-from core.logger_config import setup_logging, get_ui_handler
+from core.logger_config import setup_logging
 
 
 class MainWindow(tk.Tk):
@@ -60,8 +60,14 @@ class MainWindow(tk.Tk):
         style.configure(".", background=bg_main, foreground=fg_text, font=("Segoe UI", 10))
         style.configure("TFrame", background=bg_main)
         style.configure("TLabel", background=bg_main, foreground=fg_text)
-        style.configure("TButton", background=bg_button, borderwidth=1, focusthickness=3, padding=6)
+        # Botões padrão menores para não ocuparem tanto espaço em notebooks
+        style.configure("TButton", background=bg_button, borderwidth=1, focusthickness=3, padding=4, font=("Segoe UI", 9))
         style.map("TButton", background=[("active", bg_hover)])
+        # Estilo específico para botões de deleção (maiores e destaque vermelho)
+        style.configure("Danger.TButton", background="#E04B4B", foreground="#FFFFFF", font=("Segoe UI", 10, "bold"), padding=8)
+        style.map("Danger.TButton", background=[("active", "#C73A3A")], foreground=[("active", "#FFFFFF")])
+        # Estilo compacto para botões secundários
+        style.configure("Small.TButton", background=bg_button, foreground=fg_text, font=("Segoe UI", 9), padding=2)
         style.configure("TEntry", fieldbackground="#FFFFFF", bordercolor=border)
 
     # =====================================================
@@ -98,34 +104,38 @@ class MainWindow(tk.Tk):
             for text, cmd in buttons:
                 ttk.Button(group, text=text, width=btn_width, command=cmd).pack(pady=4, fill="x")
 
+        # Grupos com botões menores por padrão (para caber em telas menores)
         add_group("Branch", [
             ("🔄 Atualizar Branch", self.on_atualizar_branch),
             ("🌿 Checkout de Branch", self.on_checkout_branch),
             ("🌱 Criar Branch", self.on_criar_branch),
-        ], btn_width=22)
+        ], btn_width=18)
         add_group("Commit", [
             ("💬 Fazer Commit", self.on_commit),
             ("💾 Commit + Push", self.on_commit_push),
             ("↩️ Rollback de Alterações", self.on_realizar_rollback_de_alteracoes),
             ("↩️ Rollback de Commit", self.on_realizar_rollback),
-        ], btn_width=22)
+        ], btn_width=18)
         add_group("Pull Request", [
             ("🔗 Criar Pull Request", self.on_criar_pr),
             ("✅ Merge Pull Request", self.on_merge_pr),
-        ], btn_width=22)
+        ], btn_width=18)
         add_group("Stash", [
             ("💾 Salvar Stash", self.on_salvar_stash),
             ("📋 Ver Stashes", self.on_ver_stashes),
             ("♻️ Aplicar Stash", self.on_aplicar_stash),
             ("🗑️ Limpar Stashes", self.on_limpar_stashes),
-        ], btn_width=22)
-        add_group("Deleção", [
-            ("🧹 Deletar Todas as Branches Locais (exceto protegidas)", self.on_deletar_todas_locais),
-            ("🗑️ Deletar Branch Local Selecionada", self.on_deletar_branch_local),
-            ("🧹 Deletar Todas as Branches Remotas (exceto protegidas)", self.on_deletar_todas_remotas),
-            ("🚮 Deletar Branch Remota Selecionada", self.on_deletar_branch_remota),
-            ("❌ Sair do Sistema", self.destroy),
-        ], btn_width=60)
+        ], btn_width=18)
+
+        # Grupo Deleção com botões destacados e maiores (independentes dos outros)
+        delete_group = ttk.LabelFrame(button_area, text="Deleção", padding=(12, 8))
+        delete_group.pack(side="left", padx=10, fill="y", expand=True, anchor="n")
+        # Botões de deleção maiores e com estilo Danger.TButton
+        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Locais (exceto protegidas)", command=self.on_deletar_todas_locais, style="Danger.TButton", width=44).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🗑️ Deletar Branch Local Selecionada", command=self.on_deletar_branch_local, style="Danger.TButton", width=32).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Remotas (exceto protegidas)", command=self.on_deletar_todas_remotas, style="Danger.TButton", width=44).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🚮 Deletar Branch Remota Selecionada", command=self.on_deletar_branch_remota, style="Danger.TButton", width=32).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="❌ Sair do Sistema", command=self.destroy, width=18).pack(pady=6, fill="x")
 
         # Área de logs separada visualmente
         logs_label = ttk.Label(main_frame, text="🧾 Logs de Execução:", font=("Segoe UI", 13, "bold"), anchor="w")
@@ -134,6 +144,7 @@ class MainWindow(tk.Tk):
         log_frame.pack(fill="both", expand=True)
         log_scrollbar = ttk.Scrollbar(log_frame, orient="vertical")
         log_scrollbar.pack(side="right", fill="y")
+        # Logs: fonte um pouco menor para caber em telas menores, com wrap e scrollbar
         self.log_text = tk.Text(
             log_frame,
             height=12,
@@ -142,7 +153,7 @@ class MainWindow(tk.Tk):
             bg="#F3F6FA",
             fg="#2E3440",
             relief="flat",
-            font=("Segoe UI", 12, "bold"),
+            font=("Segoe UI", 11),
             yscrollcommand=log_scrollbar.set,
             wrap="word"
         )
@@ -243,21 +254,65 @@ class MainWindow(tk.Tk):
         except Exception as e:
             return messagebox.showerror("Erro", str(e))
 
-        def atualizar(branch):
+        # Popup customizado: selecionar branch, base e strategy (rebase/merge)
+        popup = tk.Toplevel(self)
+        popup.title("Atualizar Branch")
+        popup.geometry("520x260")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text="Branch (origem):").pack(pady=(12, 4))
+        branch_var = tk.StringVar(value=branches[0] if branches else "")
+        branch_combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        branch_combo.pack()
+
+        # Base branch options: detectar principais remotas
+        try:
+            remotes = list_remote_branches(self.repo_path)
+        except Exception:
+            remotes = []
+        # Offer common bases first
+        base_options = [b for b in ["develop", "main", "master"] if b in remotes]
+        if not base_options:
+            base_options = remotes[:3] if remotes else ["main"]
+
+        ttk.Label(popup, text="Branch Base (destino):").pack(pady=(12, 4))
+        base_var = tk.StringVar(value=base_options[0] if base_options else "main")
+        base_combo = ttk.Combobox(popup, textvariable=base_var, values=base_options, state="readonly", width=50)
+        base_combo.pack()
+
+        ttk.Label(popup, text="Strategy:").pack(pady=(12, 4))
+        strategy_var = tk.StringVar(value="rebase")
+        strat_frame = ttk.Frame(popup)
+        strat_frame.pack()
+        ttk.Radiobutton(strat_frame, text="Rebase (recomendado)", variable=strategy_var, value="rebase").grid(row=0, column=0, padx=8)
+        ttk.Radiobutton(strat_frame, text="Merge", variable=strategy_var, value="merge").grid(row=0, column=1, padx=8)
+
+        ttk.Label(popup, text="Ao ocorrer conflito: o processo irá abortar e você deverá resolver localmente.", font=("Segoe UI", 9)).pack(pady=(8, 4))
+
+        def confirmar():
+            selected_branch = branch_var.get().strip()
+            selected_base = base_var.get().strip() or None
+            selected_strategy = strategy_var.get()
+            if not selected_branch:
+                return messagebox.showwarning("Aviso", "Selecione uma branch para atualizar.")
+            popup.destroy()
+
             def execute():
-                return update_branch(self.repo_path, branch)
+                return update_branch(self.repo_path, selected_branch, base_branch=selected_base, strategy=selected_strategy)
 
             def on_success(msg):
                 messagebox.showinfo("Sucesso", msg)
                 self.log(msg)
 
             def on_error(error):
-                messagebox.showerror("Erro", str(error))
+                # Mostrar instruções claras para resolver conflitos
+                messagebox.showerror("Erro ao atualizar branch", str(error))
                 self.log(f"Erro ao atualizar branch: {error}")
 
             self._run_async(execute, on_success=on_success, on_error=on_error)
 
-        self._popup("Atualizar Branch", "Selecione uma branch:", atualizar, combo_values=branches)
+        ttk.Button(popup, text="Atualizar", command=confirmar, width=20).pack(pady=12)
 
     def on_checkout_branch(self):
         if not self.repo_path:
@@ -800,6 +855,8 @@ class MainWindow(tk.Tk):
             style.configure("TLabelFrame", background="#181A20", foreground="#FFFFFF")
             # Botões
             style.configure("TButton", background="#23272e", foreground="#FFFFFF", borderwidth=1, focusthickness=3, padding=6)
+            # Danger button visible on dark
+            style.configure("Danger.TButton", background="#E04B4B", foreground="#FFFFFF")
             style.map("TButton",
                 background=[("active", "#31343b")],
                 foreground=[("active", "#FFFFFF")]
@@ -816,6 +873,7 @@ class MainWindow(tk.Tk):
             style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
             style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
             style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+            style.configure("Danger.TButton", background="#E04B4B", foreground="#FFFFFF")
             style.map("TButton", background=[("active", "#C7D8EE")])
             style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
             if hasattr(self, 'log_text'):
@@ -829,6 +887,7 @@ class MainWindow(tk.Tk):
                 style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
                 style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
                 style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+                style.configure("Danger.TButton", background="#E04B4B", foreground="#FFFFFF")
                 style.map("TButton", background=[("active", "#C7D8EE")])
                 style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
                 if hasattr(self, 'log_text'):
@@ -840,6 +899,7 @@ class MainWindow(tk.Tk):
                 style.configure("TLabel", background="#F9FAFB", foreground="#2E3440")
                 style.configure("TLabelFrame", background="#F9FAFB", foreground="#2E3440")
                 style.configure("TButton", background="#D7E3F4", foreground="#2E3440")
+                style.configure("Danger.TButton", background="#E04B4B", foreground="#FFFFFF")
                 style.map("TButton", background=[("active", "#C7D8EE")])
                 style.configure("TEntry", fieldbackground="#FFFFFF", foreground="#2E3440")
                 if hasattr(self, 'log_text'):
