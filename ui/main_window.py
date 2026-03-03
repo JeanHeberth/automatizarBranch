@@ -91,7 +91,11 @@ class MainWindow(tk.Tk):
         header = ttk.Label(main_frame, text="Automação de Branches 🚀", font=("Segoe UI Semibold", 22), anchor="center")
         header.pack(pady=(0, 8))
         subheader = ttk.Label(main_frame, text="Gerencie branches, commits, PRs e mais de forma visual e simples.", font=("Segoe UI", 12), anchor="center")
-        subheader.pack(pady=(0, 18))
+        subheader.pack(pady=(0, 8))
+
+        # Status label visível para confirmações imediatas (ex.: branch criada a partir de X)
+        self.status_label = ttk.Label(main_frame, text="", font=("Segoe UI", 10, "bold"), foreground="#2E8B57")
+        self.status_label.pack(pady=(0, 10))
 
         # Área do repositório
         repo_frame = ttk.Frame(main_frame)
@@ -294,6 +298,12 @@ class MainWindow(tk.Tk):
             def on_success(msg):
                 messagebox.showinfo("Sucesso", msg)
                 self.log(msg)
+                try:
+                    # Mostrar confirmação visível por alguns segundos
+                    self.status_label.config(text=msg)
+                    self.after(8000, lambda: self.status_label.config(text=""))
+                except Exception:
+                    pass
 
             def on_error(error):
                 err_str = str(error)
@@ -395,6 +405,12 @@ class MainWindow(tk.Tk):
             def on_success(msg):
                 messagebox.showinfo("Sucesso", msg)
                 self.log(msg)
+                try:
+                    # Mostrar confirmação visível por alguns segundos
+                    self.status_label.config(text=msg)
+                    self.after(8000, lambda: self.status_label.config(text=""))
+                except Exception:
+                    pass
 
             def on_error(error):
                 err_str = str(error)
@@ -462,16 +478,66 @@ class MainWindow(tk.Tk):
     def on_criar_branch(self):
         if not self.repo_path:
             return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
-        self._popup("Criar Branch", "Digite o nome da nova branch:", self._criar_branch_action, entry=True)
-
-    def _criar_branch_action(self, name):
+        # Custom popup: name + base selection (default main/master)
         try:
-            result = create_branch(self.repo_path, name)
-            messagebox.showinfo("Sucesso", result)
-            self.log(result)
-        except GitCommandError as e:
-            messagebox.showerror("Erro", str(e))
-            self.log(str(e))
+            remotes = list_remote_branches(self.repo_path)
+        except Exception:
+            remotes = []
+
+        # Build base options: prefer main/master, then develop, then other remotes
+        base_options = []
+        for pref in ["main", "master", "develop"]:
+            if pref in remotes and pref not in base_options:
+                base_options.append(pref)
+        for r in remotes:
+            if r not in base_options:
+                base_options.append(r)
+        if not base_options:
+            base_options = ["main", "develop"]
+
+        popup = tk.Toplevel(self)
+        popup.title("Criar Branch")
+        popup.geometry("520x200")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text="Nome da nova branch:").pack(pady=(12, 4))
+        name_var = tk.StringVar()
+        name_entry = ttk.Entry(popup, textvariable=name_var, width=50)
+        name_entry.pack()
+
+        ttk.Label(popup, text="Base (a partir de):").pack(pady=(12, 4))
+        base_var = tk.StringVar(value=base_options[0])
+        base_combo = ttk.Combobox(popup, textvariable=base_var, values=base_options, state="readonly", width=50)
+        base_combo.pack()
+
+        def confirmar():
+            name = name_var.get().strip()
+            base = base_var.get().strip() or None
+            if not name:
+                return messagebox.showwarning("Aviso", "Informe o nome da nova branch.")
+            popup.destroy()
+
+            def execute():
+                return create_branch(self.repo_path, name, base_branch=base)
+
+            def on_success(msg):
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
+                try:
+                    # Mostrar confirmação visível por alguns segundos
+                    self.status_label.config(text=msg)
+                    self.after(8000, lambda: self.status_label.config(text=""))
+                except Exception:
+                    pass
+
+            def on_error(err):
+                messagebox.showerror("Erro", str(err))
+                self.log(str(err))
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        ttk.Button(popup, text="Criar Branch", command=confirmar).pack(pady=14)
 
     def on_commit(self):
         if not self.repo_path:
