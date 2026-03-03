@@ -13,6 +13,7 @@ from core.git_operations import GitCommandError, get_current_branch, get_default
 from utils.worker_thread import run_in_thread
 from core.logger_config import setup_logging
 from utils.settings import get_theme, set_theme
+from utils.settings import get_protected_branches, set_protected_branches, get_default_strategy, set_default_strategy
 
 
 class MainWindow(tk.Tk):
@@ -98,6 +99,7 @@ class MainWindow(tk.Tk):
         self.repo_entry = ttk.Entry(repo_frame, width=50, state="readonly")
         self.repo_entry.pack(side="left", padx=(8, 0), fill="x", expand=True)
         ttk.Button(repo_frame, text="Selecionar Repositório", command=self.on_select_repo).pack(side="left", padx=(12, 0))
+        ttk.Button(repo_frame, text="⚙ Configurações", command=self._open_settings).pack(side="left", padx=(8, 0))
 
         # Frame de botões agrupados por categoria
         button_area = ttk.Frame(main_frame)
@@ -910,3 +912,40 @@ class MainWindow(tk.Tk):
                 if hasattr(self, 'log_text'):
                     self.log_text.config(bg="#F3F6FA", fg="#2E3440", insertbackground="#2E3440")
                 self.configure(bg="#F9FAFB")
+
+
+    def _open_settings(self):
+        """Abre um dialog para editar branches protegidas e strategy padrão."""
+        popup = tk.Toplevel(self)
+        popup.title("Configurações")
+        popup.geometry("520x280")
+        popup.configure(bg="#F9FAFB")
+        popup.resizable(False, False)
+
+        ttk.Label(popup, text="Branches protegidas (separadas por vírgula):").pack(pady=(12, 4))
+        pb = get_protected_branches()
+        pb_var = tk.StringVar(value=", ".join(pb))
+        pb_entry = ttk.Entry(popup, textvariable=pb_var, width=60)
+        pb_entry.pack()
+
+        ttk.Label(popup, text="Strategy padrão para atualização:").pack(pady=(12, 4))
+        ds = get_default_strategy()
+        strategy_var = tk.StringVar(value=ds)
+        ttk.Radiobutton(popup, text="Rebase (recomendado)", variable=strategy_var, value="rebase").pack()
+        ttk.Radiobutton(popup, text="Merge", variable=strategy_var, value="merge").pack()
+
+        def salvar():
+            branches_text = pb_var.get().strip()
+            branches = [b.strip() for b in branches_text.split(",") if b.strip()]
+            if not branches:
+                messagebox.showwarning("Aviso", "Ao menos uma branch protegida deve ser informada.")
+                return
+            try:
+                set_protected_branches(branches)
+                set_default_strategy(strategy_var.get())
+                messagebox.showinfo("Salvo", "Configurações salvas com sucesso.")
+                popup.destroy()
+            except Exception as e:
+                messagebox.showerror("Erro", str(e))
+
+        ttk.Button(popup, text="Salvar", command=salvar).pack(pady=12)

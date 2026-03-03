@@ -48,3 +48,36 @@ def set_theme(value: str) -> None:
     settings["theme"] = value
     save_settings(settings)
 
+
+def get_protected_branches(default: Optional[list] = None) -> list:
+    """Retorna a lista de branches protegidas do arquivo de configuração do usuário."""
+    if default is None:
+        default = ["main", "master", "develop"]
+    settings = load_settings()
+    pb = settings.get("protected_branches")
+    if isinstance(pb, list) and pb:
+        return pb
+    return default
+
+
+def set_protected_branches(branches: list) -> None:
+    """Define a lista de branches protegidas no arquivo de configurações."""
+    settings = load_settings()
+    settings["protected_branches"] = branches
+    save_settings(settings)
+
+
+def get_default_strategy(default: str = "rebase") -> str:
+    settings = load_settings()
+    s = settings.get("default_strategy")
+    if s in {"rebase", "merge"}:
+        return s
+    return default
+
+
+def set_default_strategy(value: str) -> None:
+    if value not in {"rebase", "merge"}:
+        return
+    settings = load_settings()
+    settings["default_strategy"] = value
+    save_settings(settings)

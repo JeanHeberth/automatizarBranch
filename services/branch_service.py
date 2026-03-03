@@ -2,6 +2,7 @@ from typing import List
 from core.git_operations import run_git_command, GitCommandError
 from core.logger_config import get_logger
 from core.cache import cached
+from utils.settings import get_protected_branches as _get_protected_branches, get_default_strategy
 
 logger = get_logger()
 
@@ -33,7 +34,7 @@ def list_remote_branches(repo_path: str) -> List[str]:
         raise
 
 
-def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy: str = "rebase") -> str:
+def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy: str | None = None) -> str:
     """Atualiza a branch local sincronizando com a branch base.
 
     Fluxo:
@@ -74,6 +75,10 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
             )
             logger.warning(msg)
             raise GitCommandError(msg)
+
+        # Buscar estratégia padrão do usuário se não fornecida
+        if not strategy:
+            strategy = get_default_strategy()
 
         # Busca informações remotas mais recentes (base e a própria branch)
         logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
@@ -266,7 +271,7 @@ def validate_pr_ready(repo_path: str, base_branch: str, compare_branch: str) -> 
 
 def get_protected_branches() -> List[str]:
     """Retorna lista de branches protegidas (não podem ser deletadas)."""
-    return ["main", "master", "develop"]
+    return _get_protected_branches()
 
 
 def delete_all_remote_branches(repo_path: str) -> List[str]:
