@@ -70,7 +70,11 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
         if not base_branch:
             base_branch = _get_default_base_branch(repo_path)
 
-        # Verifica alterações locais não commitadas
+        # Buscar estratégia padrão do usuário se não fornecida
+        if not strategy:
+            strategy = get_default_strategy()
+
+        # Verifica alterações locais não commitadas (após checkout)
         status = run_git_command(repo_path, ["status", "--porcelain"])
         if status.strip():
             msg = (
@@ -79,10 +83,6 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
             )
             logger.warning(msg)
             raise GitCommandError(msg)
-
-        # Buscar estratégia padrão do usuário se não fornecida
-        if not strategy:
-            strategy = get_default_strategy()
 
         # Busca informações remotas mais recentes (base e a própria branch)
         logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
@@ -196,9 +196,31 @@ def create_branch(repo_path: str, branch_name: str) -> str:
         # Garante prefixo 'feature/'
         if not branch_name.startswith("feature/"):
             branch_name = f"feature/{branch_name}"
+
+        # Detectar branch base padrão e garantir que está atualizada
+        base_branch = _get_default_base_branch(repo_path)
+        # Buscar remotas para base e para develop (manter ambos atualizados)
+        try:
+            run_git_command(repo_path, ["fetch", "origin", base_branch])
+        except GitCommandError:
+            # Se fetch falhar, log e re-raise
+            logger.warning(f"Falha ao buscar origin/{base_branch} antes de criar branch.")
+            raise
+
+        # Também atualizar develop para segurança, caso base seja main/master
+        if base_branch != "develop":
+            try:
+                run_git_command(repo_path, ["fetch", "origin", "develop"])
+            except GitCommandError:
+                logger.debug("Não foi possível fetch origin/develop (pode não existir), prosseguindo.")
+
+        # Fazer checkout para a branch base antes de criar a nova branch
+        run_git_command(repo_path, ["checkout", base_branch])
+
+        # Criar a nova branch a partir da base atualizada
         run_git_command(repo_path, ["checkout", "-b", branch_name])
-        # Mantém o emoji 🌱 para compatibilidade com testes/UX
-        msg = f"🌱 Branch '{branch_name}' criada com sucesso."
+
+        msg = f"🌱 Branch '{branch_name}' criada com sucesso a partir de '{base_branch}'."
         logger.info(msg)
         return msg
     except GitCommandError as e:

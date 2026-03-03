@@ -115,6 +115,8 @@ class MainWindow(tk.Tk):
         # Grupos com botões menores por padrão (para caber em telas menores)
         add_group("Branch", [
             ("🔄 Atualizar Branch", self.on_atualizar_branch),
+            ("🔁 Rebase Branch", lambda: self._quick_update(strategy="rebase")),
+            ("🔀 Merge Branch", lambda: self._quick_update(strategy="merge")),
             ("🌿 Checkout de Branch", self.on_checkout_branch),
             ("🌱 Criar Branch", self.on_criar_branch),
         ], btn_width=18)
@@ -262,51 +264,31 @@ class MainWindow(tk.Tk):
         except Exception as e:
             return messagebox.showerror("Erro", str(e))
 
-        # Popup customizado: selecionar branch, base e strategy (rebase/merge)
+        # Popup simplificado: apenas selecionar a branch que será atualizada
         popup = tk.Toplevel(self)
         popup.title("Atualizar Branch")
-        popup.geometry("520x260")
+        popup.geometry("480x160")
         popup.configure(bg="#F9FAFB")
         popup.resizable(False, False)
 
-        ttk.Label(popup, text="Branch (origem):").pack(pady=(12, 4))
+        ttk.Label(popup, text="Selecione a branch a ser atualizada:").pack(pady=(12, 4))
         branch_var = tk.StringVar(value=branches[0] if branches else "")
         branch_combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
         branch_combo.pack()
 
-        # Base branch options: detectar principais remotas
-        try:
-            remotes = list_remote_branches(self.repo_path)
-        except Exception:
-            remotes = []
-        # Offer common bases first
-        base_options = [b for b in ["develop", "main", "master"] if b in remotes]
-        if not base_options:
-            base_options = remotes[:3] if remotes else ["main"]
-
-        ttk.Label(popup, text="Branch Base (destino):").pack(pady=(12, 4))
-        base_var = tk.StringVar(value=base_options[0] if base_options else "main")
-        base_combo = ttk.Combobox(popup, textvariable=base_var, values=base_options, state="readonly", width=50)
-        base_combo.pack()
-
-        ttk.Label(popup, text="Strategy:").pack(pady=(12, 4))
-        strategy_var = tk.StringVar(value="rebase")
-        strat_frame = ttk.Frame(popup)
-        strat_frame.pack()
-        ttk.Radiobutton(strat_frame, text="Rebase (recomendado)", variable=strategy_var, value="rebase").grid(row=0, column=0, padx=8)
-        ttk.Radiobutton(strat_frame, text="Merge", variable=strategy_var, value="merge").grid(row=0, column=1, padx=8)
-
-        ttk.Label(popup, text="Ao ocorrer conflito: o processo irá abortar e você deverá resolver localmente.", font=("Segoe UI", 9)).pack(pady=(8, 4))
+        ttk.Label(popup, text="Será usada a strategy padrão definida em Configurações.", font=("Segoe UI", 9)).pack(pady=(8, 4))
 
         def confirmar():
             selected_branch = branch_var.get().strip()
-            selected_base = base_var.get().strip() or None
-            selected_strategy = strategy_var.get()
+            selected_base = None
+            selected_strategy = get_default_strategy()
             if not selected_branch:
                 return messagebox.showwarning("Aviso", "Selecione uma branch para atualizar.")
+            self.log(f"Iniciando atualização da branch '{selected_branch}' (strategy={selected_strategy})")
             popup.destroy()
 
             def execute():
+                self.log(f"[thread] Executando update_branch({selected_branch}, strategy={selected_strategy})")
                 return update_branch(self.repo_path, selected_branch, base_branch=selected_base, strategy=selected_strategy)
 
             def on_success(msg):
@@ -314,25 +296,16 @@ class MainWindow(tk.Tk):
                 self.log(msg)
 
             def on_error(error):
-                # Se houver conflito, oferecer tentativa de resolução automática
                 err_str = str(error)
-                if "Conflito" in err_str or "conflito" in err_str or "Conflict" in err_str:
-                    # Perguntar se deseja testar em preview
-                    do_preview = messagebox.askyesno(
-                        "Resolução automática - Preview",
-                        "Deseja testar a resolução em modo PREVIEW (não altera o repositório) antes de aplicar?"
-                    )
-                    # Escolher favor
-                    choice = messagebox.askquestion(
-                        "Escolher favor",
-                        "Escolha 'theirs' para priorizar alterações da base (recomendado) ou 'ours' para priorizar sua branch.\n\nEscolha 'Yes' para 'theirs' ou 'No' para 'ours'."
-                    )
+                # Se houver conflito, oferecer tentativa de resolução automática
+                if "Conflito" in err_str or "conflit" in err_str or "Conflict" in err_str:
+                    do_preview = messagebox.askyesno("Resolução automática - Preview", "Deseja testar a resolução em modo PREVIEW (não altera o repositório) antes de aplicar?")
+                    choice = messagebox.askquestion("Escolher favor", "Escolha 'theirs' para priorizar alterações da base (recomendado) ou 'ours' para priorizar sua branch.\n\nEscolha 'Yes' para 'theirs' ou 'No' para 'ours'.")
                     favor = "theirs" if choice == "yes" else "ours"
 
                     if do_preview:
-                        # Execute preview (no push)
                         def execute_resolve_preview():
-                            return resolve_conflict(self.repo_path, branch_var.get(), base_branch=base_var.get(), favor=favor, strategy=strategy_var.get(), preview=True, push=False)
+                            return resolve_conflict(self.repo_path, selected_branch, base_branch=selected_base, favor=favor, strategy=selected_strategy, preview=True, push=False)
 
                         def on_success_resolve(msg):
                             messagebox.showinfo("Preview concluído", msg)
@@ -345,14 +318,10 @@ class MainWindow(tk.Tk):
                         self._run_async(execute_resolve_preview, on_success=on_success_resolve, on_error=on_error_resolve)
                         return
                     else:
-                        # Perguntar se deseja aplicar e fazer push
-                        do_push = messagebox.askyesno(
-                            "Aplicar resolução",
-                            "Deseja aplicar a resolução automática na branch e DAR PUSH automático ao remoto?\n(Escolha NÃO para aplicar localmente sem push)"
-                        )
+                        do_push = messagebox.askyesno("Aplicar resolução", "Deseja aplicar a resolução automática na branch e DAR PUSH automático ao remoto? (Escolha NÃO para aplicar localmente sem push)")
 
                         def execute_resolve_apply():
-                            return resolve_conflict(self.repo_path, branch_var.get(), base_branch=base_var.get(), favor=favor, strategy=strategy_var.get(), preview=False, push=do_push)
+                            return resolve_conflict(self.repo_path, selected_branch, base_branch=selected_base, favor=favor, strategy=selected_strategy, preview=False, push=do_push)
 
                         def on_success_resolve(msg):
                             messagebox.showinfo("Resolução aplicada", msg)
@@ -364,7 +333,7 @@ class MainWindow(tk.Tk):
 
                         self._run_async(execute_resolve_apply, on_success=on_success_resolve, on_error=on_error_resolve)
                         return
-                # Mostrar instruções claras para resolver conflitos
+
                 messagebox.showerror("Erro ao atualizar branch", err_str)
                 self.log(f"Erro ao atualizar branch: {err_str}")
                 # Mostrar instruções claras para resolver conflitos
@@ -373,7 +342,104 @@ class MainWindow(tk.Tk):
 
             self._run_async(execute, on_success=on_success, on_error=on_error)
 
-        ttk.Button(popup, text="Atualizar", command=confirmar, width=20).pack(pady=12)
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        ttk.Button(popup, text="Atualizar", command=confirmar, width=18).pack(pady=12)
+
+    def _quick_update(self, strategy: str):
+        """Abre popup simples para escolher branch/base e executa update_branch com strategy fixa."""
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        try:
+            branches = list_branches(self.repo_path)
+        except Exception as e:
+            return messagebox.showerror("Erro", str(e))
+
+        popup = tk.Toplevel(self)
+        popup.title(f"{strategy.capitalize()} Branch")
+        popup.geometry("480x220")
+        popup.configure(bg="#F9FAFB")
+
+        ttk.Label(popup, text="Branch (origem):").pack(pady=(12, 4))
+        branch_var = tk.StringVar(value=branches[0] if branches else "")
+        branch_combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        branch_combo.pack()
+
+        try:
+            remotes = list_remote_branches(self.repo_path)
+        except Exception:
+            remotes = []
+        base_options = [b for b in ["develop", "main", "master"] if b in remotes]
+        if not base_options:
+            base_options = remotes[:3] if remotes else ["main"]
+
+        ttk.Label(popup, text="Branch Base (destino):").pack(pady=(12, 4))
+        base_var = tk.StringVar(value=base_options[0] if base_options else "main")
+        base_combo = ttk.Combobox(popup, textvariable=base_var, values=base_options, state="readonly", width=50)
+        base_combo.pack()
+
+        def confirmar_quick():
+            b = branch_var.get().strip()
+            base = base_var.get().strip() or None
+            if not b:
+                return messagebox.showwarning("Aviso", "Selecione uma branch.")
+            popup.destroy()
+
+            self.log(f"Iniciando {strategy} de '{b}' sobre '{base}'")
+
+            def execute():
+                self.log(f"[thread] Executando update_branch({b}, base={base}, strategy={strategy})")
+                return update_branch(self.repo_path, b, base_branch=base, strategy=strategy)
+
+            def on_success(msg):
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
+
+            def on_error(error):
+                err_str = str(error)
+                if "Conflito" in err_str or "conflito" in err_str or "Conflict" in err_str:
+                    do_preview = messagebox.askyesno("Resolução automática - Preview", "Deseja testar a resolução em modo PREVIEW (não altera o repositório) antes de aplicar?")
+                    choice = messagebox.askquestion("Escolher favor", "Escolha 'theirs' para priorizar alterações da base (recomendado) ou 'ours' para priorizar sua branch.\n\nEscolha 'Yes' para 'theirs' ou 'No' para 'ours'.")
+                    favor = "theirs" if choice == "yes" else "ours"
+
+                    if do_preview:
+                        def execute_resolve_preview():
+                            return resolve_conflict(self.repo_path, b, base_branch=base, favor=favor, strategy=strategy, preview=True, push=False)
+
+                        def on_success_resolve(msg):
+                            messagebox.showinfo("Preview concluído", msg)
+                            self.log(msg)
+
+                        def on_error_resolve(err):
+                            messagebox.showerror("Falha no preview", str(err))
+                            self.log(str(err))
+
+                        self._run_async(execute_resolve_preview, on_success=on_success_resolve, on_error=on_error_resolve)
+                        return
+                    else:
+                        do_push = messagebox.askyesno("Aplicar resolução", "Deseja aplicar a resolução automática na branch e DAR PUSH automático ao remoto? (Escolha NÃO para aplicar localmente sem push)")
+
+                        def execute_resolve_apply():
+                            return resolve_conflict(self.repo_path, b, base_branch=base, favor=favor, strategy=strategy, preview=False, push=do_push)
+
+                        def on_success_resolve(msg):
+                            messagebox.showinfo("Resolução aplicada", msg)
+                            self.log(msg)
+
+                        def on_error_resolve(err):
+                            messagebox.showerror("Falha na resolução automática", str(err))
+                            self.log(str(err))
+
+                        self._run_async(execute_resolve_apply, on_success=on_success_resolve, on_error=on_error_resolve)
+                        return
+
+                messagebox.showerror("Erro", err_str)
+                self.log(err_str)
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        ttk.Button(popup, text=strategy.capitalize(), command=confirmar_quick, width=20).pack(pady=12)
 
     def on_checkout_branch(self):
         if not self.repo_path:
