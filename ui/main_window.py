@@ -367,6 +367,11 @@ class MainWindow(tk.Tk):
                 # Mostrar instruções claras para resolver conflitos
                 messagebox.showerror("Erro ao atualizar branch", err_str)
                 self.log(f"Erro ao atualizar branch: {err_str}")
+                # Mostrar instruções claras para resolver conflitos
+                messagebox.showerror("Erro ao atualizar branch", str(error))
+                self.log(f"Erro ao atualizar branch: {error}")
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
 
         ttk.Button(popup, text="Atualizar", command=confirmar, width=20).pack(pady=12)
 

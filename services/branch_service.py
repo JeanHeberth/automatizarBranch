@@ -93,6 +93,16 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
         remotas = list_remote_branches(repo_path)
         remote_exists = branch in remotas
 
+
+        # Busca informações remotas mais recentes (base e a própria branch)
+        logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
+        run_git_command(repo_path, ["fetch", "origin", base_branch])
+        run_git_command(repo_path, ["fetch", "origin", branch])
+
+        # Verifica se branch existe no remoto usando helper
+        remotas = list_remote_branches(repo_path)
+        remote_exists = branch in remotas
+
         if not remote_exists:
             # Branch é nova: push inicial com tracking
             logger.info(f"Branch '{branch}' não existe no remoto. Fazendo push inicial com tracking...")
