@@ -3,6 +3,9 @@ from core.git_operations import run_git_command, GitCommandError
 from core.logger_config import get_logger
 from core.cache import cached
 from utils.settings import get_protected_branches as _get_protected_branches, get_default_strategy
+import json
+import shutil
+import tempfile
 
 logger = get_logger()
 
@@ -295,3 +298,105 @@ def delete_all_remote_branches(repo_path: str) -> List[str]:
     except Exception as e:
         logger.error(f"Erro ao deletar branches remotas: {e}")
         raise GitCommandError(f"Erro ao deletar branches remotas: {e}")
+
+
+def resolve_conflict(repo_path: str, branch: str, base_branch: str = None, favor: str = "theirs", strategy: str | None = None, preview: bool = False, push: bool = False) -> str:
+    """Tenta resolver conflitos automaticamente usando a estratégia de merge option (-X).
+
+    Args:
+        repo_path: caminho do repositório
+        branch: branch local a atualizar
+        base_branch: branch base para sincronização (se None detecta automaticamente)
+        favor: 'ours' ou 'theirs' — qual lado priorizar ao resolver conflitos
+        strategy: 'rebase' ou 'merge' (se None usa configuração do usuário)
+
+    Returns:
+        Mensagem de sucesso
+
+    Raises:
+        GitCommandError em caso de falha na resolução automática.
+    """
+    # Normalize inputs
+    if favor not in {"ours", "theirs"}:
+        raise GitCommandError(f"Favor inválido: {favor}. Use 'ours' ou 'theirs'.")
+
+    # Determine strategy default
+    if not strategy:
+        strategy = get_default_strategy()
+
+    # If preview mode, operate on a temporary copy of the repository
+    work_dir = repo_path
+    temp_dir = None
+    try:
+        if preview:
+            temp_dir = tempfile.mkdtemp(prefix="automatizar_preview_")
+            # Copy repository to temp (including .git) to simulate changes locally without affecting original
+            shutil.copytree(repo_path, temp_dir, dirs_exist_ok=True)
+            work_dir = temp_dir
+
+        # Garantir checkout na branch dentro work_dir
+        run_git_command(work_dir, ["checkout", branch])
+
+        if not base_branch:
+            base_branch = _get_default_base_branch(work_dir)
+
+        # Buscar remotos atualizados
+        run_git_command(work_dir, ["fetch", "origin", base_branch])
+        run_git_command(work_dir, ["fetch", "origin", branch])
+
+        if strategy == "rebase":
+            # Tentar rebase com opção de favor
+            try:
+                run_git_command(work_dir, ["rebase", "-X", favor, f"origin/{base_branch}"])
+            except GitCommandError as e:
+                # Tentar abortar para deixar repositório limpo
+                try:
+                    run_git_command(work_dir, ["rebase", "--abort"])
+                except Exception:
+                    logger.debug("Falha ao abortar rebase automaticamente durante resolve_conflict.")
+                raise GitCommandError(f"Falha ao tentar rebase com favor='{favor}': {e}")
+
+            # Push após rebase se solicitado e não em preview
+            if push and not preview:
+                run_git_command(work_dir, ["push", "origin", branch, "--force-with-lease"])
+                pushed_msg = " e enviado ao remoto"
+            else:
+                pushed_msg = " (não enviado ao remoto)" if preview or not push else ""
+
+            msg = f"✅ Conflitos resolvidos automaticamente em '{branch}' usando favor='{favor}' (rebase){pushed_msg}."
+            logger.info(msg)
+            return msg
+
+        elif strategy == "merge":
+            try:
+                run_git_command(work_dir, ["merge", "-X", favor, f"origin/{base_branch}"])
+            except GitCommandError as e:
+                # Em caso de falha, tentar abortar merge
+                try:
+                    run_git_command(work_dir, ["merge", "--abort"])
+                except Exception:
+                    logger.debug("Falha ao abortar merge automaticamente durante resolve_conflict.")
+                raise GitCommandError(f"Falha ao tentar merge com favor='{favor}': {e}")
+
+            if push and not preview:
+                run_git_command(work_dir, ["push", "origin", branch])
+                pushed_msg = " e enviado ao remoto"
+            else:
+                pushed_msg = " (não enviado ao remoto)" if preview or not push else ""
+
+            msg = f"✅ Conflitos resolvidos automaticamente em '{branch}' usando favor='{favor}' (merge){pushed_msg}."
+            logger.info(msg)
+            return msg
+
+        else:
+            raise GitCommandError(f"Strategy inválida: {strategy}. Use 'rebase' ou 'merge'.")
+
+    finally:
+        # Cleanup temp dir if used
+        if temp_dir:
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                logger.debug(f"Falha ao remover tempdir {temp_dir}")
+        # End
+        pass
