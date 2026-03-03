@@ -4,6 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 # Importação de serviços desacoplados
 from services.branch_service import list_branches, update_branch, create_branch, list_remote_branches, \
     safe_checkout
+from services.branch_service import resolve_conflict
 from services.commit_service import commit_changes, commit_and_push
 from services.delete_service import delete_remote_branch, delete_local_branch, delete_all_local_branches, delete_all_remote_branches
 from services.rollback_service import rollback_commit, rollback_changes
@@ -313,6 +314,59 @@ class MainWindow(tk.Tk):
                 self.log(msg)
 
             def on_error(error):
+                # Se houver conflito, oferecer tentativa de resolução automática
+                err_str = str(error)
+                if "Conflito" in err_str or "conflito" in err_str or "Conflict" in err_str:
+                    # Perguntar se deseja testar em preview
+                    do_preview = messagebox.askyesno(
+                        "Resolução automática - Preview",
+                        "Deseja testar a resolução em modo PREVIEW (não altera o repositório) antes de aplicar?"
+                    )
+                    # Escolher favor
+                    choice = messagebox.askquestion(
+                        "Escolher favor",
+                        "Escolha 'theirs' para priorizar alterações da base (recomendado) ou 'ours' para priorizar sua branch.\n\nEscolha 'Yes' para 'theirs' ou 'No' para 'ours'."
+                    )
+                    favor = "theirs" if choice == "yes" else "ours"
+
+                    if do_preview:
+                        # Execute preview (no push)
+                        def execute_resolve_preview():
+                            return resolve_conflict(self.repo_path, branch_var.get(), base_branch=base_var.get(), favor=favor, strategy=strategy_var.get(), preview=True, push=False)
+
+                        def on_success_resolve(msg):
+                            messagebox.showinfo("Preview concluído", msg)
+                            self.log(msg)
+
+                        def on_error_resolve(err):
+                            messagebox.showerror("Falha no preview", str(err))
+                            self.log(str(err))
+
+                        self._run_async(execute_resolve_preview, on_success=on_success_resolve, on_error=on_error_resolve)
+                        return
+                    else:
+                        # Perguntar se deseja aplicar e fazer push
+                        do_push = messagebox.askyesno(
+                            "Aplicar resolução",
+                            "Deseja aplicar a resolução automática na branch e DAR PUSH automático ao remoto?\n(Escolha NÃO para aplicar localmente sem push)"
+                        )
+
+                        def execute_resolve_apply():
+                            return resolve_conflict(self.repo_path, branch_var.get(), base_branch=base_var.get(), favor=favor, strategy=strategy_var.get(), preview=False, push=do_push)
+
+                        def on_success_resolve(msg):
+                            messagebox.showinfo("Resolução aplicada", msg)
+                            self.log(msg)
+
+                        def on_error_resolve(err):
+                            messagebox.showerror("Falha na resolução automática", str(err))
+                            self.log(str(err))
+
+                        self._run_async(execute_resolve_apply, on_success=on_success_resolve, on_error=on_error_resolve)
+                        return
+                # Mostrar instruções claras para resolver conflitos
+                messagebox.showerror("Erro ao atualizar branch", err_str)
+                self.log(f"Erro ao atualizar branch: {err_str}")
                 # Mostrar instruções claras para resolver conflitos
                 messagebox.showerror("Erro ao atualizar branch", str(error))
                 self.log(f"Erro ao atualizar branch: {error}")
@@ -499,8 +553,32 @@ class MainWindow(tk.Tk):
                 popup.destroy()
 
             def on_error(error):
-                messagebox.showerror("Erro no Merge PR", str(error))
-                self.log(f"Erro ao mesclar PR: {error}")
+                err_str = str(error)
+                if "mescl" in err_str.lower() or "merge" in err_str.lower() or "conflit" in err_str.lower():
+                    if messagebox.askyesno("Conflito no Merge PR", "Conflito detectado ao mesclar PR. Deseja tentar resolução automática priorizando 'theirs' (base) ou 'ours' (PR)?"):
+                        # Ask choice
+                        choice = messagebox.askquestion("Escolher favor", "Escolha 'theirs' para priorizar a branch base ou 'ours' para priorizar o PR.\n\nEscolha 'Yes' para 'theirs' ou 'No' para 'ours'.")
+                        favor = "theirs" if choice == "yes" else "ours"
+
+                        # Usar branch atual and default base from input (we have pr_number only) -> fallback to default base
+                        def execute_resolve():
+                            # aqui usamos branch atual
+                            branch = get_current_branch(self.repo_path)
+                            base = get_default_main_branch(self.repo_path)
+                            return resolve_conflict(self.repo_path, branch, base_branch=base, favor=favor, strategy=None)
+
+                        def on_success_resolve(msg):
+                            messagebox.showinfo("Resolução automática", msg)
+                            self.log(msg)
+
+                        def on_error_resolve(err):
+                            messagebox.showerror("Falha na resolução automática", str(err))
+                            self.log(str(err))
+
+                        self._run_async(execute_resolve, on_success=on_success_resolve, on_error=on_error_resolve)
+                        return
+                messagebox.showerror("Erro no Merge PR", err_str)
+                self.log(f"Erro ao mesclar PR: {err_str}")
 
             self._run_async(execute, on_success=on_success, on_error=on_error)
 
