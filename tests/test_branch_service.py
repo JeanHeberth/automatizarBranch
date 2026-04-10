@@ -84,7 +84,7 @@ class TestBranchService(unittest.TestCase):
 
         from services.branch_service import force_sync_branch
         res = force_sync_branch(self.test_repo_path, "feature/new", stash_backup=True)
-        self.assertIn("forçada", res)
+        self.assertIn("Atualizado com sucesso!", res)
 
     @patch('services.branch_service.run_git_command')
     def test_create_branch(self, mock_run_git):
