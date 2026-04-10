@@ -7,6 +7,7 @@ from pathlib import Path
 from core.logger_config import get_logger
 from utils.repo_utils import get_repo_info
 from core.github_auth import get_github_token, GitHubAuthError
+from core.auth_manager import auth_manager
 
 logger = get_logger()
 
@@ -36,12 +37,14 @@ def create_pull_request(repo_path: Path, base: str, compare: str, title: str) ->
     try:
         logger.info(f"Criando PR: {compare} → {base}")
 
-        # ✨ Obter token de forma segura
-        try:
-            token = get_github_token()
-        except GitHubAuthError as e:
-            logger.error(f"Erro de autenticação: {e}")
-            raise Exception(str(e))
+        # Prefer token stored in AuthManager (set by UI) to avoid extra gh calls
+        token = auth_manager.get_token()
+        if not token:
+            try:
+                token = get_github_token()
+            except GitHubAuthError as e:
+                logger.error(f"Erro de autenticao: {e}")
+                raise Exception(str(e))
 
         info = get_repo_info(repo_path)
         url = f"https://api.github.com/repos/{info.full_name}/pulls"

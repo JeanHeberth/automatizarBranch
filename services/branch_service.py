@@ -38,95 +38,119 @@ def list_remote_branches(repo_path: str) -> List[str]:
         raise
 
 
-def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy: str | None = None) -> str:
+def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy: str = None) -> str:
     """Atualiza a branch local sincronizando com a branch base.
 
     Fluxo:
     - Faz checkout para `branch`.
-    - Faz fetch de `origin/<base_branch>` e `origin/<branch>`.
-    - Aplica sincronização conforme `strategy`:
-        - "rebase" (padrão): rebase local sobre `origin/<base_branch>` e push com --force-with-lease
-        - "merge": merge de `origin/<base_branch>` (preserva merges) e push normal
-
-    Args:
-        repo_path: caminho do repositório
-        branch: branch local a atualizar
-        base_branch: branch base (se None, detecta develop/main/master)
-        strategy: "rebase" ou "merge"
-
-    Returns:
-        Mensagem de sucesso.
-
-    Raises:
-        GitCommandError: em casos de erros git ou conflitos que precisem de ação manual.
+    - Para `main`/`master`: faz um pull --ff-only de origin/<branch> para garantir que a branch local acompanhe o
+      último merge remoto (como no padrão do IntelliJ que reflete o último PR mesclado).
+    - Para demais branches: comporta-se conforme estratégia (rebase/merge) como antes.
     """
     try:
-        logger.info(f"Atualizando branch '{branch}' com estratégia '{strategy}'...")
+        logger.info(f"Atualizando branch '{branch}' com estratgia '{strategy}'...")
 
         # Faz checkout para a branch alvo
         run_git_command(repo_path, ["checkout", branch])
 
-        # Detectar branch base padrão se não informada
-        if not base_branch:
-            base_branch = _get_default_base_branch(repo_path)
-
-        # Buscar estratégia padrão do usuário se não fornecida
-        if not strategy:
-            strategy = get_default_strategy()
-
-        # Verifica alterações locais não commitadas (após checkout)
+        # Verifica alteracoes locais no commitadas (apos checkout)
         status = run_git_command(repo_path, ["status", "--porcelain"])
         if status.strip():
             msg = (
-                f"⚠️ Existem alterações locais em '{branch}'.\n"
-                "Faça commit ou descarte antes de atualizar."
+                f"⚠️ Existem alteraes locais em '{branch}'.\n"
+                "Faa commit ou descarte antes de atualizar."
             )
             logger.warning(msg)
             raise GitCommandError(msg)
 
-        # Busca informações remotas mais recentes (base e a própria branch)
+        # Caso especial: atualizar branch principal (main/master) para refletir o ultimo PR mesclado
+        if branch in {"main", "master"}:
+            logger.info(f"Atualizando branch principal '{branch}' para o ultimo merge remoto (origin/{branch})...")
+            # Buscar o estado remoto
+            run_git_command(repo_path, ["fetch", "origin", branch])
+
+            remotas = list_remote_branches(repo_path)
+            remote_exists = branch in remotas
+
+            if not remote_exists:
+                # Se nao existe no remoto, push inicial com tracking
+                logger.info(f"Branch principal '{branch}' nao existe no remoto. Fazendo push inicial com tracking...")
+                run_git_command(repo_path, ["push", "-u", "origin", branch])
+                msg = f"✅ Branch '{branch}' criada e enviada ao remoto."
+                logger.info(msg)
+                return msg
+
+            # Tentar fast-forward pull (sem mesclar) — reflete o ultimo PR mesclado no remoto
+            try:
+                run_git_command(repo_path, ["pull", "--ff-only", "origin", branch])
+            except GitCommandError as e:
+                msg = (
+                    f"⚠️ Nao foi possivel atualizar '{branch}' via fast-forward: {e}.\n"
+                    "Pode haver divergencia entre o local e origin. Faça commit/backup e execute 'git fetch origin && git reset --hard origin/" + branch + "' se desejar forcar."
+                )
+                logger.warning(msg)
+                raise GitCommandError(msg)
+
+            msg = "Atualizado com sucesso!"
+            logger.info(msg)
+            return msg
+
+        # Para outras branches, detecta branch base padrao se nao informada
+        if not base_branch:
+            base_branch = _get_default_base_branch(repo_path)
+
+        # Se a base detectada for a própria branch (ex: atualizar 'develop' com base 'develop'),
+        # apenas atualize a branch a partir do remoto (pull) em vez de tentar rebase/merge sobre si mesma.
+        if base_branch == branch:
+            logger.info(f"Base igual à branch ('{branch}'). Fazendo pull de origin/{branch} para atualizar.")
+            # Buscar remoto e dar pull normal (não forçamos rebase aqui)
+            run_git_command(repo_path, ["fetch", "origin", branch])
+            try:
+                run_git_command(repo_path, ["pull", "origin", branch])
+            except GitCommandError as e:
+                # Se houver conflito ou outras situações, repassar erro com instruções
+                msg = (
+                    f"⚠️ Falha ao atualizar '{branch}' a partir de origin/{branch}: {e}.\n"
+                    "Verifique alterações locais ou use a função de forçar sincronização se desejar sobrescrever o local."
+                )
+                logger.warning(msg)
+                raise GitCommandError(msg)
+
+            msg = "Atualizado com sucesso!"
+            logger.info(msg)
+            return msg
+
+        # Buscar estrategia padrao do usuario se nao fornecida
+        if not strategy:
+            strategy = get_default_strategy()
+
+        # Buscar informacoes remotas mais recentes (base e a propria branch)
         logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
         run_git_command(repo_path, ["fetch", "origin", base_branch])
         run_git_command(repo_path, ["fetch", "origin", branch])
 
-        # Verifica se branch existe no remoto usando helper
-        remotas = list_remote_branches(repo_path)
-        remote_exists = branch in remotas
-
-
-        # Busca informações remotas mais recentes (base e a própria branch)
-        logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
-        run_git_command(repo_path, ["fetch", "origin", base_branch])
-        run_git_command(repo_path, ["fetch", "origin", branch])
-
-
-        # Busca informações remotas mais recentes (base e a própria branch)
-        logger.debug(f"Fazendo fetch de origin/{base_branch} e origin/{branch}")
-        run_git_command(repo_path, ["fetch", "origin", base_branch])
-        run_git_command(repo_path, ["fetch", "origin", branch])
-
-        # Verifica se branch existe no remoto usando helper
+        # Verifica se branch existe no remoto
         remotas = list_remote_branches(repo_path)
         remote_exists = branch in remotas
 
         if not remote_exists:
-            # Branch é nova: push inicial com tracking
-            logger.info(f"Branch '{branch}' não existe no remoto. Fazendo push inicial com tracking...")
+            # Branch nova: push inicial com tracking
+            logger.info(f"Branch '{branch}' nao existe no remoto. Fazendo push inicial com tracking...")
             run_git_command(repo_path, ["push", "-u", "origin", branch])
             msg = f"✅ Branch '{branch}' criada e enviada ao remoto."
             logger.info(msg)
             return msg
 
-        # Caso exista, sincroniza com a base
+        # Caso exista, sincroniza com a base conforme estrategia
         if strategy not in {"rebase", "merge"}:
-            raise GitCommandError(f"Strategy inválida: {strategy}. Use 'rebase' ou 'merge'.")
+            raise GitCommandError(f"Strategy invalida: {strategy}. Use 'rebase' ou 'merge'.")
 
         if strategy == "rebase":
             logger.info(f"Rebaseando '{branch}' sobre origin/{base_branch}...")
             try:
                 run_git_command(repo_path, ["rebase", f"origin/{base_branch}"])
             except GitCommandError as e:
-                # Tentativa de abortar rebase para deixar repositório em estado limpo
+                # Tentativa de abortar rebase para deixar repositorio em estado limpo
                 try:
                     run_git_command(repo_path, ["rebase", "--abort"])
                 except Exception:
@@ -138,7 +162,7 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
                 logger.warning(msg)
                 raise GitCommandError(msg)
 
-            # Force push seguro após rebase (preserva trabalho remoto se houver divergência)
+            # Force push seguro apos rebase
             run_git_command(repo_path, ["push", "origin", branch, "--force-with-lease"])
             msg = f"✅ Branch '{branch}' sincronizada com '{base_branch}' via rebase."
 
@@ -149,12 +173,12 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
             except GitCommandError as e:
                 msg = (
                     f"⚠️ Conflito durante merge: {e}.\n"
-                    "Resolva os conflitos localmente e faça commit antes de tentar novamente."
+                    "Resolva os conflitos localmente e faca commit antes de tentar novamente."
                 )
                 logger.warning(msg)
                 raise GitCommandError(msg)
 
-            # Push normal (merge preserva histórico)
+            # Push normal (merge preserva historico)
             run_git_command(repo_path, ["push", "origin", branch])
             msg = f"✅ Branch '{branch}' sincronizada com '{base_branch}' via merge."
 
@@ -165,6 +189,46 @@ def update_branch(repo_path: str, branch: str, base_branch: str = None, strategy
     except Exception as e:
         logger.error(f"Erro ao atualizar branch '{branch}': {e}")
         raise GitCommandError(f"Erro ao atualizar branch '{branch}': {e}")
+
+
+def force_sync_branch(repo_path: str, branch: str, stash_backup: bool = False) -> str:
+    """Força sincronização da branch local com origin/<branch> usando reset --hard.
+
+    Se `stash_backup` for True, as alterações locais não commitadas serão salvas em stash antes do reset.
+    Retorna mensagem de sucesso.
+    """
+    try:
+        logger.info(f"Forçando sincronização de '{branch}' (stash_backup={stash_backup})...")
+
+        # Fazer fetch do remoto
+        run_git_command(repo_path, ["fetch", "origin", branch])
+
+        # Verificar alterações locais
+        status = run_git_command(repo_path, ["status", "--porcelain"])
+        if status.strip():
+            if stash_backup:
+                logger.info("Alterações locais detectadas — criando stash de backup antes do reset")
+                stash_msg = run_git_command(repo_path, ["stash", "push", "-m", "backup before force sync"]) or "stash created"
+                logger.debug(f"Stash criado: {stash_msg}")
+            else:
+                msg = (
+                    "⚠️ Existem alterações locais não commitadas. Use 'stash_backup=True' para salvar antes de forçar,"
+                    " ou faça commit/discard manualmente."
+                )
+                logger.warning(msg)
+                raise GitCommandError(msg)
+
+        # Reset hard para origin/<branch>
+        run_git_command(repo_path, ["reset", "--hard", f"origin/{branch}"])
+
+        msg = "Atualizado com sucesso!"
+        logger.info(msg)
+        return msg
+    except GitCommandError:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao forçar sincronização: {e}")
+        raise GitCommandError(str(e))
 
 
 def _get_default_base_branch(repo_path: str) -> str:

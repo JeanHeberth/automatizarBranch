@@ -13,7 +13,9 @@ from services.stash_service import stash_save, stash_list, stash_apply, stash_po
 from core.git_operations import GitCommandError, get_current_branch, get_default_main_branch
 from utils.worker_thread import run_in_thread
 from core.logger_config import setup_logging
-from utils.settings import get_theme, set_theme
+from core.github_auth import get_github_user, get_github_token
+from core.auth_manager import auth_manager
+from utils.settings import get_theme
 from utils.settings import get_protected_branches, set_protected_branches, get_default_strategy, set_default_strategy
 
 
@@ -121,6 +123,7 @@ class MainWindow(tk.Tk):
             ("🔄 Atualizar Branch", self.on_atualizar_branch),
             ("🔁 Rebase Branch", lambda: self._quick_update(strategy="rebase")),
             ("🔀 Merge Branch", lambda: self._quick_update(strategy="merge")),
+            ("🔧 Forçar Sincronização (reset hard origin)", self.on_force_sync_branch),
             ("🌿 Checkout de Branch", self.on_checkout_branch),
             ("🌱 Criar Branch", self.on_criar_branch),
         ], btn_width=18)
@@ -145,10 +148,11 @@ class MainWindow(tk.Tk):
         delete_group = ttk.LabelFrame(button_area, text="Deleção", padding=(12, 8))
         delete_group.pack(side="left", padx=10, fill="y", expand=True, anchor="n")
         # Botões de deleção maiores e com estilo Danger.TButton
-        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Locais (exceto protegidas)", command=self.on_deletar_todas_locais, style="Danger.TButton", width=44).pack(pady=6, fill="x")
-        ttk.Button(delete_group, text="🗑️ Deletar Branch Local Selecionada", command=self.on_deletar_branch_local, style="Danger.TButton", width=32).pack(pady=6, fill="x")
-        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Remotas (exceto protegidas)", command=self.on_deletar_todas_remotas, style="Danger.TButton", width=44).pack(pady=6, fill="x")
-        ttk.Button(delete_group, text="🚮 Deletar Branch Remota Selecionada", command=self.on_deletar_branch_remota, style="Danger.TButton", width=32).pack(pady=6, fill="x")
+        # Aumentar largura para garantir que a mensagem completa seja visível
+        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Locais (exceto protegidas)", command=self.on_deletar_todas_locais, style="Danger.TButton", width=70).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🗑️ Deletar Branch Local Selecionada", command=self.on_deletar_branch_local, style="Danger.TButton", width=70).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🧹 Deletar Todas as Branches Remotas (exceto protegidas)", command=self.on_deletar_todas_remotas, style="Danger.TButton", width=70).pack(pady=6, fill="x")
+        ttk.Button(delete_group, text="🚮 Deletar Branch Remota Selecionada", command=self.on_deletar_branch_remota, style="Danger.TButton", width=70).pack(pady=6, fill="x")
         ttk.Button(delete_group, text="❌ Sair do Sistema", command=self.destroy, width=18).pack(pady=6, fill="x")
 
         # Área de logs separada visualmente
@@ -185,20 +189,45 @@ class MainWindow(tk.Tk):
 
     def _run_async(self, func, args=(), on_success=None, on_error=None):
         """Executa função em thread para não congelar UI."""
+        # Evita agendamento duplicado se já houver operação em andamento
+        if getattr(self, 'is_loading', False):
+            # aviso leve ao usuário e log
+            try:
+                self.log("Outra operação está em andamento. Aguarde.")
+            except Exception:
+                pass
+            try:
+                messagebox.showwarning("Atenção", "Outra operação está em andamento. Aguarde.")
+            except Exception:
+                # Em ambientes de teste/headless, messagebox pode falhar; apenas ignore
+                pass
+            return None
+
         def on_success_wrapper(result):
+            # Marca que terminou antes de chamar callback para permitir novas ações iniciadas pelo on_success
             self.is_loading = False
             if on_success:
                 on_success(result)
 
         def on_error_wrapper(error):
+            # Marca que terminou antes de chamar callback para permitir novas ações iniciadas pelo on_error
             self.is_loading = False
             if on_error:
                 on_error(error)
 
         def on_finally():
+            # Garantir que o flag seja zerado mesmo que callbacks não existam
+            try:
+                self.is_loading = False
+            except Exception:
+                pass
             # Atualizar UI após conclusão
-            self.update_idletasks()
+            try:
+                self.update_idletasks()
+            except Exception:
+                pass
 
+        # Marcar carregamento e iniciar worker
         self.is_loading = True
         run_in_thread(
             func,
@@ -222,6 +251,64 @@ class MainWindow(tk.Tk):
             self.repo_entry.insert(0, repo)
             self.repo_entry.config(state="readonly")
             self.log(f"Repositório selecionado: {repo}")
+            # Ao selecionar repositório, tentar obter usuário e token GitHub do ambiente (gh CLI / GCM / .env)
+            self.github_user = None
+            self.github_token = None
+
+            def _get_auth():
+                # tenta obter username e token; get_github_user/get_github_token já lançam GitHubAuthError
+                user = get_github_user()
+                token = get_github_token()
+                return (user, token)
+
+            def _on_auth_success(result):
+                try:
+                    user, token = result
+                    self.github_user = user
+                    self.github_token = token
+                    # store in AuthManager for services to reuse
+                    auth_manager.set_user(user)
+                    auth_manager.set_token(token)
+                    self.log(f"Autenticado como: {user}")
+                    # Mostrar usuário no status por alguns segundos
+                    try:
+                        self.status_label.config(text=f"Usuário: {user}")
+                        self.after(8000, lambda: self.status_label.config(text=""))
+                    except Exception:
+                        pass
+                except Exception as e:
+                    # Caso a função retorne formato inesperado
+                    self.log(f"Autenticação incompleta: {e}")
+
+            def _on_auth_error(error):
+                err_str = str(error)
+                self.log(f"Falha ao obter autenticação GitHub: {err_str}")
+                # Perguntar ao usuário se deseja continuar sem autenticação
+                cont = messagebox.askyesno(
+                    "Autenticação GitHub",
+                    "Não foi possível obter credenciais GitHub automaticamente. Deseja continuar sem autenticação?\n\n"
+                    "(Recomendado: execute 'gh auth login' no terminal e tente novamente.)"
+                )
+
+                if not cont:
+                    # abrir instruções básicas
+                    messagebox.showinfo("Instruções de Autenticação",
+                                        "Abra um terminal e execute: gh auth login\nDepois, selecione o repositório novamente.")
+
+            # Executar obtenção de credenciais em thread para não travar a UI
+            try:
+                self._run_async(_get_auth, args=(), on_success=_on_auth_success, on_error=_on_auth_error)
+            except Exception as e:
+                # Caso não seja possível executar em thread
+                try:
+                            user, token = _get_auth()
+                            self.github_user = user
+                            self.github_token = token
+                            auth_manager.set_user(user)
+                            auth_manager.set_token(token)
+                            self.log(f"Autenticado como: {user}")
+                except Exception as ee:
+                    self.log(f"Erro ao obter autenticação: {ee}")
 
     # =====================================================
     # POPUP PADRÃO
@@ -350,8 +437,7 @@ class MainWindow(tk.Tk):
                 messagebox.showerror("Erro ao atualizar branch", str(error))
                 self.log(f"Erro ao atualizar branch: {error}")
 
-            self._run_async(execute, on_success=on_success, on_error=on_error)
-
+            # Executa a operação em background (apenas uma vez)
             self._run_async(execute, on_success=on_success, on_error=on_error)
 
         ttk.Button(popup, text="Atualizar", command=confirmar, width=18).pack(pady=12)
@@ -474,6 +560,62 @@ class MainWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Erro", str(e))
             self.log(str(e))
+
+    def on_force_sync_branch(self):
+        """Força sincronização da branch selecionada com origin/<branch> (reset --hard).
+
+        Faz backup automático via stash se houver alterações locais, e pede confirmação.
+        """
+        if not self.repo_path:
+            return messagebox.showwarning("Atenção", "Selecione o repositório primeiro.")
+
+        try:
+            branches = list_branches(self.repo_path)
+        except Exception as e:
+            return messagebox.showerror("Erro", str(e))
+
+        popup = tk.Toplevel(self)
+        popup.title("Forçar Sincronização")
+        popup.geometry("480x180")
+        popup.configure(bg="#F9FAFB")
+
+        ttk.Label(popup, text="Selecione a branch a ser forçada:").pack(pady=(12, 4))
+        branch_var = tk.StringVar(value=branches[0] if branches else "")
+        branch_combo = ttk.Combobox(popup, textvariable=branch_var, values=branches, state="readonly", width=50)
+        branch_combo.pack()
+
+        def confirmar():
+            b = branch_var.get().strip()
+            if not b:
+                return messagebox.showwarning("Aviso", "Selecione uma branch.")
+            if not messagebox.askyesno("Confirmação", f"Deseja FORÇAR sincronização de '{b}' com origin/{b}?\nIsto irá descartar alterações locais não commitadas."):
+                return
+            popup.destroy()
+
+            def execute():
+                # fetch origin/branch
+                run_result = None
+                try:
+                    self.log(f"[thread] Fetch origin/{b}")
+                    from core.git_operations import run_git_command
+                    run_git_command(self.repo_path, ["fetch", "origin", b])
+                    # reset hard
+                    run_git_command(self.repo_path, ["reset", "--hard", f"origin/{b}"])
+                    return "Atualizado com sucesso!"
+                except Exception as e:
+                    raise e
+
+            def on_success(msg):
+                messagebox.showinfo("Sucesso", msg)
+                self.log(msg)
+
+            def on_error(err):
+                messagebox.showerror("Erro", str(err))
+                self.log(str(err))
+
+            self._run_async(execute, on_success=on_success, on_error=on_error)
+
+        ttk.Button(popup, text="Forçar Sincronização", command=confirmar, width=20).pack(pady=12)
 
     def on_criar_branch(self):
         if not self.repo_path:
@@ -639,7 +781,19 @@ class MainWindow(tk.Tk):
         compare_combo.bind("<<ComboboxSelected>>", atualizar_titulo)
 
         def criar_pr_action():
+            auto_update_var = tk.BooleanVar(value=False)
+            ttk.Checkbutton(popup, text="Atualizar minha branch automaticamente antes de criar PR (rebase/merge)", variable=auto_update_var).pack(pady=6)
+
             def execute():
+                # Se o usuario escolheu auto-update, tentamos atualizar a branch compare antes de criar PR
+                if auto_update_var.get():
+                    try:
+                        self.log(f"Atualizando branch '{compare_var.get()}' automaticamente antes de criar PR")
+                        # usar estrategia default
+                        update_branch(self.repo_path, compare_var.get())
+                    except Exception as e:
+                        # Se falhar, repassar erro para o fluxo de on_error
+                        raise
                 return create_pr(self.repo_path, base_var.get(), compare_var.get(), title_var.get())
 
             def on_success(msg):

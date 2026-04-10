@@ -10,6 +10,7 @@ from services.branch_service import (
     checkout_branch,
     safe_checkout
 )
+from services.delete_service import delete_local_branch, delete_remote_branch, delete_all_local_branches, delete_all_remote_branches
 from core.git_operations import GitCommandError
 
 
@@ -50,6 +51,40 @@ class TestBranchService(unittest.TestCase):
         branches = list_remote_branches(self.test_repo_path)
         self.assertIn("main", branches)
         self.assertIn("feature/new", branches)
+
+    @patch('services.delete_service.run_git_command')
+    @patch('services.delete_service.list_branches')
+    def test_delete_local_branch_feature_prefix(self, mock_list_branches, mock_run_git):
+        """Ao pedir para deletar 'new' deve resolver para 'feature/new' se existir."""
+        mock_list_branches.return_value = ["main", "feature/new", "develop"]
+        mock_run_git.return_value = "Deleted branch"
+
+        res = delete_local_branch(self.test_repo_path, "new")
+        self.assertIn("feature/new", res)
+
+    @patch('services.delete_service.run_git_command')
+    @patch('services.delete_service.list_remote_branches')
+    def test_delete_remote_branch_feature_prefix(self, mock_list_remote, mock_run_git):
+        mock_list_remote.return_value = ["main", "feature/new"]
+        mock_run_git.return_value = "Deleted"
+        res = delete_remote_branch(self.test_repo_path, "new")
+        self.assertIn("feature/new", res)
+
+    @patch('services.branch_service.run_git_command')
+    def test_force_sync_branch_with_stash(self, mock_run_git):
+        """Testa force_sync_branch com stash backup ativado"""
+        # Simular saída de status com alterações locais na primeira chamada e stash push responsa
+        # run_git_command chama: fetch origin branch, status, stash push, reset --hard
+        mock_run_git.side_effect = [
+            "",  # fetch -> empty
+            " M file.py\n",  # status -> has changes
+            "Saved working directory and index",  # stash push
+            "HEAD is now at ..."  # reset --hard
+        ]
+
+        from services.branch_service import force_sync_branch
+        res = force_sync_branch(self.test_repo_path, "feature/new", stash_backup=True)
+        self.assertIn("forçada", res)
 
     @patch('services.branch_service.run_git_command')
     def test_create_branch(self, mock_run_git):
@@ -119,4 +154,3 @@ class TestBranchServiceErrors(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

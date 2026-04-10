@@ -137,6 +137,7 @@ def get_github_token() -> str:
 
 def get_github_user() -> str:
     """Obtém nome de usuário GitHub autenticado."""
+    # Primeiro tenta via GitHub CLI (mais confiável quando disponível)
     try:
         result = subprocess.run(
             ["gh", "api", "user", "--jq", ".login"],
@@ -145,16 +146,37 @@ def get_github_user() -> str:
             timeout=5
         )
 
-        if result.returncode == 0:
+        if result.returncode == 0 and result.stdout.strip():
             username = result.stdout.strip()
-            logger.debug(f"Usuário GitHub: {username}")
+            logger.debug(f"Usuário GitHub (gh): {username}")
             return username
-        else:
-            raise GitHubAuthError("Erro ao obter usuário GitHub")
-
     except FileNotFoundError:
-        raise GitHubAuthError("GitHub CLI não instalado")
+        # gh não instalado — iremos tentar outras fontes abaixo
+        logger.debug("gh CLI não encontrado, tentando fallback via token...")
+    except subprocess.TimeoutExpired:
+        logger.debug("gh CLI timeout ao obter usuário, tentando fallback via token...")
     except Exception as e:
-        logger.error(f"Erro ao obter usuário: {e}")
+        logger.debug(f"gh CLI falhou ao obter usuário: {e}; tentando fallback via token...")
+
+    # Fallback: se tivermos um token (via gh, GCM ou .env), usar API direta
+    try:
+        token = get_github_token()
+        # fazer uma chamada simples para /user
+        import requests
+        resp = requests.get("https://api.github.com/user", headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json"
+        }, timeout=5)
+        if resp.status_code == 200:
+            username = resp.json().get("login")
+            if username:
+                logger.debug(f"Usuário GitHub (token): {username}")
+                return username
+        raise GitHubAuthError("Erro ao obter usuário GitHub via token/API")
+    except GitHubAuthError:
+        # propagar erro de autenticação para a camada superior
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao obter usuário via token/API: {e}")
         raise GitHubAuthError(str(e))
 

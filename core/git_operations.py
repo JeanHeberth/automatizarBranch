@@ -83,12 +83,15 @@ def merge_pull_request(repo_path: Path, pr_number: int) -> str:
     """Faz o merge de um Pull Request via GitHub API."""
     try:
         logger.info(f"Mesclando PR #{pr_number}...")
-        # ✨ Usar autenticação segura via GitHub CLI
-        from core.github_auth import get_github_token
-        token = get_github_token()
+        # ✨ Prefer token do AuthManager para evitar chamadas repetidas ao gh
+        from core.auth_manager import auth_manager
+        token = auth_manager.get_token()
+        if not token:
+            from core.github_auth import get_github_token
+            token = get_github_token()
 
         if not token:
-            raise GitCommandError("Falha ao obter autenticação GitHub")
+            raise GitCommandError("Falha ao obter autenticao GitHub")
 
         info = get_repo_info(repo_path)
         url = f"https://api.github.com/repos/{info.full_name}/pulls/{pr_number}/merge"
